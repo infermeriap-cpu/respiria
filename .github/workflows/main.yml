@@ -1,0 +1,36 @@
+name: Actualizacion semanal de Inhaladores CIMA
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Descargar codigo del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Instalar dependencias
+        run: |
+          pip install requests openpyxl beautifulsoup4
+
+      - name: Ejecutar script de actualización
+        run: python respiria_cima_updater.py --tot
+
+      - name: Guardar cambios y subir al repositorio
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add inhaladors_MPOC_ASMA_Avanzado_FINAL.xlsx RespirIA_v2.html
+          git commit -m "Actualización automática CIMA" || echo "Sin cambios"
+          git push
