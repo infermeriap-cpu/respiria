@@ -1,18 +1,103 @@
-name: Actualizacion semanal de Inhaladores CIMA
+name: RespirIA — Actualitzacio CIMA
 
 on:
   schedule:
-    - cron: '0 7 * * 1'
-  workflow_dispatch:
+    - cron: '0 7 * * 1'  # cada dilluns a les 7h
+  workflow_dispatch:      # permet executar manualment
 
 jobs:
-  actualizar:
+  # ── JOB 1: Detecta novetats i actualitza Excel ──────────────────────────────
+  detectar_novetats:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      hi_ha_novetats: ${{ steps.check.outputs.hi_ha_novetats }}
+      num_novetats: ${{ steps.check.outputs.num_novetats }}
 
     steps:
-      - name: Descargar codigo del repositorio
+      - name: Descarregar repositori
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Instal·lar dependències
+        run: pip install requests openpyxl beautifulsoup4
+
+      - name: Executar script — detectar novetats
+        id: check
+        run: |
+          python respiria_cima_updater.py --detecta
+          if [ -f novetats_count.txt ]; then
+            COUNT=$(cat novetats_count.txt)
+            if [ "$COUNT" -gt "0" ]; then
+              echo "hi_ha_novetats=true" >> $GITHUB_OUTPUT
+              echo "num_novetats=$COUNT" >> $GITHUB_OUTPUT
+            else
+              echo "hi_ha_novetats=false" >> $GITHUB_OUTPUT
+              echo "num_novetats=0" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "hi_ha_novetats=false" >> $GITHUB_OUTPUT
+            echo "num_novetats=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Guardar Excel actualitzat
+        if: steps.check.outputs.hi_ha_novetats == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add inhaladors_MPOC_ASMA_Avanzado_FINAL.xlsx
+          git commit -m "Novetats CIMA: ${{ steps.check.outputs.num_novetats }} nous farmacos pendents de validacio" || echo "Sense canvis"
+          git push
+
+      - name: Enviar email — novetats pendents
+        if: steps.check.outputs.hi_ha_novetats == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          to: infermeriap@gmail.com
+          from: RespirIA <${{ secrets.GMAIL_USER }}>
+          subject: "RespirIA — ${{ steps.check.outputs.num_novetats }} nous inhaladors pendents de validació"
+          body: |
+            Hola Sílvia,
+
+            El sistema RespirIA ha detectat ${{ steps.check.outputs.num_novetats }} nous inhaladors comercialitzats a la CIMA que necessiten la teva validació clínica abans d'incorporar-se al prescriptor.
+
+            Accedeix a Google Sheets per validar-los:
+            https://docs.google.com/spreadsheets/d/${{ secrets.GOOGLE_SHEET_ID }}
+
+            Recorda:
+            - Revisa la dosi (columna F)
+            - Marca PHF ★ si correspon (columna O)
+            - Marca MATMA si correspon (columna P)
+            - Quan hagis validat una fila, esborra el text de la columna N
+
+            Tens 7 dies per validar. Si no ho fas, rebràs un recordatori.
+
+            Els fàrmacs NO s'incorporaran al prescriptor fins que no els validis.
+
+            Salutacions,
+            Sistema RespirIA — ICS Atenció Primària Girona
+
+  # ── JOB 2: Recordatori als 7 dies ───────────────────────────────────────────
+  recordatori_setmanal:
+    runs-on: ubuntu-latest
+    needs: detectar_novetats
+    if: needs.detectar_novetats.outputs.hi_ha_novetats == 'false'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Descarregar repositori
         uses: actions/checkout@v4
 
       - name: Configurar Python
@@ -20,17 +105,116 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Instalar dependencias
+      - name: Instal·lar dependències
+        run: pip install openpyxl
+
+      - name: Comprovar pendents antics
+        id: pendents
         run: |
-          pip install requests openpyxl beautifulsoup4
+          python respiria_cima_updater.py --comprova-pendents
+          if [ -f pendents_count.txt ]; then
+            COUNT=$(cat pendents_count.txt)
+            echo "num_pendents=$COUNT" >> $GITHUB_OUTPUT
+            if [ "$COUNT" -gt "0" ]; then
+              echo "hi_ha_pendents=true" >> $GITHUB_OUTPUT
+            else
+              echo "hi_ha_pendents=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "hi_ha_pendents=false" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Ejecutar script de actualización
-        run: python respiria_cima_updater.py --tot
+      - name: Enviar recordatori
+        if: steps.pendents.outputs.hi_ha_pendents == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          to: infermeriap@gmail.com
+          from: RespirIA <${{ secrets.GMAIL_USER }}>
+          subject: "RespirIA — RECORDATORI: ${{ steps.pendents.outputs.num_pendents }} inhaladors pendents de validació"
+          body: |
+            Hola Sílvia,
 
-      - name: Guardar cambios y subir al repositorio
+            Recordatori: encara tens ${{ steps.pendents.outputs.num_pendents }} inhaladors pendents de validació clínica al prescriptor RespirIA.
+
+            Accedeix a Google Sheets per validar-los:
+            https://docs.google.com/spreadsheets/d/${{ secrets.GOOGLE_SHEET_ID }}
+
+            Els fàrmacs NO s'incorporaran al prescriptor fins que no els validis.
+
+            Salutacions,
+            Sistema RespirIA — ICS Atenció Primària Girona
+
+  # ── JOB 3: Publica al prescriptor quan tot està validat ──────────────────────
+  publicar_si_validat:
+    runs-on: ubuntu-latest
+    needs: detectar_novetats
+    if: needs.detectar_novetats.outputs.hi_ha_novetats == 'false'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Descarregar repositori
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Instal·lar dependències
+        run: pip install requests openpyxl beautifulsoup4
+
+      - name: Comprovar si hi ha novetats validades pendents de publicar
+        id: publicar
+        run: |
+          python respiria_cima_updater.py --comprova-publicar
+          if [ -f publicar_count.txt ]; then
+            COUNT=$(cat publicar_count.txt)
+            echo "num_publicar=$COUNT" >> $GITHUB_OUTPUT
+            if [ "$COUNT" -gt "0" ]; then
+              echo "cal_publicar=true" >> $GITHUB_OUTPUT
+            else
+              echo "cal_publicar=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "cal_publicar=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Regenerar HTML amb farmacos validats
+        if: steps.publicar.outputs.cal_publicar == 'true'
+        run: python respiria_cima_updater.py --regenera
+
+      - name: Guardar HTML actualitzat
+        if: steps.publicar.outputs.cal_publicar == 'true'
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add inhaladors_MPOC_ASMA_Avanzado_FINAL.xlsx RespirIA_v2.html
-          git commit -m "Actualización automática CIMA" || echo "Sin cambios"
+          git add RespirIA_v2.html inhaladors_MPOC_ASMA_Avanzado_FINAL.xlsx
+          git commit -m "Prescriptor actualitzat: ${{ steps.publicar.outputs.num_publicar }} nous farmacos validats incorporats" || echo "Sense canvis"
           git push
+
+      - name: Enviar email — prescriptor actualitzat
+        if: steps.publicar.outputs.cal_publicar == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          to: infermeriap@gmail.com
+          from: RespirIA <${{ secrets.GMAIL_USER }}>
+          subject: "RespirIA — Prescriptor actualitzat amb ${{ steps.publicar.outputs.num_publicar }} nous farmacos"
+          body: |
+            Hola Sílvia,
+
+            El prescriptor RespirIA s'ha actualitzat automàticament amb ${{ steps.publicar.outputs.num_publicar }} nous fàrmacs que has validat.
+
+            Accedeix al prescriptor actualitzat:
+            https://infermeriap-cpu.github.io/respiria/
+
+            Salutacions,
+            Sistema RespirIA — ICS Atenció Primària Girona
