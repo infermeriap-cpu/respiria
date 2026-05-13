@@ -32,11 +32,11 @@ I_CLASSE = 0;  I_IA = 1;  I_NOM = 2;   I_CN = 3
 I_DISP   = 4;  I_DOSI = 5; I_TIPUS = 6; I_CO2 = 7
 I_FLUX   = 8;  I_FLUX4 = 9; I_LINK = 10
 I_DATA   = 11; I_ORIGEN = 12; I_ESTAT = 13
-I_PHF    = 14; I_MATMA = 15  # columnes O i P
+I_PHF    = 14; I_MATMA = 15
 
 # Colors Excel
-COLOR_NOU     = "FEF3C7"   # groc  = pendent validació
-COLOR_ATENCIO = "FEE2E2"   # vermell = consultar fitxa tècnica
+COLOR_NOU     = "FEF3C7"
+COLOR_ATENCIO = "FEE2E2"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DOSIS PHF CatSalut 2018 + GEMA 5.5
@@ -215,14 +215,12 @@ def mode_detecta():
     wb = openpyxl.load_workbook(EXCEL_PATH)
     ws = wb.active
 
-    # Llegeix CNs existents
     cns = set()
     for row in ws.iter_rows(min_row=2, values_only=True):
         cn = v(row[I_CN])
         if cn: cns.add(cn)
     print(f"  CNs existents: {len(cns)}")
 
-    # Consulta CIMA
     presentacions = get_tots_inhaladors_cima()
     novetats = [p for p in presentacions if v(p.get("cn","")) not in cns]
     print(f"  Novetats: {len(novetats)}")
@@ -232,7 +230,6 @@ def mode_detecta():
         print("✅ Cap novetat")
         return
 
-    # Backup
     shutil.copy(EXCEL_PATH, EXCEL_PATH.replace(".xlsx","_BACKUP.xlsx"))
 
     fill_nou     = PatternFill("solid", fgColor=COLOR_NOU)
@@ -322,14 +319,9 @@ def mode_comprova_publicar():
     wb_excel = openpyxl.load_workbook(EXCEL_PATH)
     ws = wb_excel.active
 
-    # Llegeix CNs actuals al HTML
     with open(HTML_PATH, "r", encoding="utf-8") as f:
         html = f.read()
 
-    # Troba files validades (col N buida) que no eren a l'Excel original
-    # Una fila és "nova i validada" si:
-    # - Té data d'incorporació (col L)
-    # - Col N és buida (validada)
     pendents_publicar = 0
     for row in ws.iter_rows(min_row=2, values_only=True):
         if len(row) <= I_ESTAT: continue
@@ -337,9 +329,7 @@ def mode_comprova_publicar():
         data   = v(row[I_DATA])
         estat  = v(row[I_ESTAT])
         if not nom: continue
-        # Si té data (és nova) i estat buit (validada) → pendent de publicar
         if data and not estat:
-            # Comprova si ja és al HTML
             if nom not in html:
                 pendents_publicar += 1
 
@@ -361,7 +351,6 @@ def mode_regenera():
         nom   = v(row[I_NOM])
         if not nom: continue
 
-        # CLAU: salta qualsevol fila amb estat no buit = no validada
         estat = v(row[I_ESTAT])
         if estat:
             print(f"  ⏭  Saltat (pendent): {nom[:40]}")
@@ -373,3 +362,22 @@ def mode_regenera():
         dosi_r = v(row[I_DOSI])
         tipus_r= v(row[I_TIPUS])
         link   = v(row[I_LINK])
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ENTRADA PRINCIPAL
+# ═══════════════════════════════════════════════════════════════════════════════
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    if "--detecta" in args:
+        mode_detecta()
+    elif "--comprova-pendents" in args:
+        mode_comprova_pendents()
+    elif "--comprova-publicar" in args:
+        mode_comprova_publicar()
+    elif "--regenera" in args:
+        mode_regenera()
+    elif "--tot" in args:
+        mode_detecta()
+        mode_regenera()
+    else:
+        print("⚠️  Cap mode especificat. Usa: --detecta | --comprova-pendents | --comprova-publicar | --regenera | --tot")
