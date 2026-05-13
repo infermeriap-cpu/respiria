@@ -40,9 +40,12 @@ jobs:
       - name: Executar script — detectar novetats
         id: check
         run: |
-          python respiria_cima_updater.py --detecta
+          set -x
+          python respiria_cima_updater.py --detecta 2>&1
+          echo "Exit code: $?"
           if [ -f novetats_count.txt ]; then
             COUNT=$(cat novetats_count.txt)
+            echo "Count trobat: $COUNT"
             if [ "$COUNT" -gt "0" ]; then
               echo "hi_ha_novetats=true" >> $GITHUB_OUTPUT
               echo "num_novetats=$COUNT" >> $GITHUB_OUTPUT
@@ -51,6 +54,7 @@ jobs:
               echo "num_novetats=0" >> $GITHUB_OUTPUT
             fi
           else
+            echo "ATENCIO: novetats_count.txt NO existeix"
             echo "hi_ha_novetats=false" >> $GITHUB_OUTPUT
             echo "num_novetats=0" >> $GITHUB_OUTPUT
           fi
