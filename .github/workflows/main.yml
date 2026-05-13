@@ -26,6 +26,17 @@ jobs:
       - name: Instal·lar dependencies
         run: pip install requests openpyxl beautifulsoup4
 
+      - name: Verificar entorn
+        run: |
+          echo "=== Python version ==="
+          python --version
+          echo "=== Fitxers al repositori ==="
+          ls -la
+          echo "=== Test importacions ==="
+          python -c "import requests, openpyxl; from bs4 import BeautifulSoup; print('Importacions OK')"
+          echo "=== Test lectura Excel ==="
+          python -c "import openpyxl; wb=openpyxl.load_workbook('inhaladors_MPOC_ASMA_Avanzado_FINAL.xlsx'); ws=wb.active; print(f'Excel OK: {ws.max_row} files')"
+
       - name: Executar script — detectar novetats
         id: check
         run: |
