@@ -3,12 +3,12 @@
 RespirIA — Actualitzador automàtic CIMA → Excel → HTML
 =======================================================
 Autora: Sílvia Álvarez Vega · ICS Atenció Primària Girona
-Versió: 5.0 · 2026-04-12
+Versió: 5.1 · 2026-05-13
 
 Modes d'execució:
   --detecta          Consulta CIMA, afegeix novetats al Excel, escriu novetats_count.txt
   --comprova-pendents Compta files amb col N no buida, escriu pendents_count.txt
-  --comprova-publicar Compta files validades (col N buida, col P_VALIDAT = SI), escriu publicar_count.txt
+  --comprova-publicar Compta files validades (col N buida), escriu publicar_count.txt
   --regenera         Regenera HTML amb NOMÉS els fàrmacs validats (col N buida)
   --tot              detecta + regenera (ús local)
 """
@@ -27,14 +27,12 @@ HTML_PATH   = "RespirIA_v2.html"
 OUTPUT_HTML = "RespirIA_v2.html"
 CIMA_BASE   = "https://cima.aemps.es/cima/rest"
 
-# Índexs de columnes (base 0 per a row[i])
 I_CLASSE = 0;  I_IA = 1;  I_NOM = 2;   I_CN = 3
 I_DISP   = 4;  I_DOSI = 5; I_TIPUS = 6; I_CO2 = 7
 I_FLUX   = 8;  I_FLUX4 = 9; I_LINK = 10
 I_DATA   = 11; I_ORIGEN = 12; I_ESTAT = 13
 I_PHF    = 14; I_MATMA = 15
 
-# Colors Excel
 COLOR_NOU     = "FEF3C7"
 COLOR_ATENCIO = "FEE2E2"
 
@@ -142,10 +140,10 @@ def cima_get(endpoint, params=None, retries=3):
                 return None
 
 def get_tots_inhaladors_cima():
-    print("📡 Consultant CIMA...")
+    print("📡 Consultant CIMA — filtrant per ATC R03 (inhaladors MPOC/Asma)...")
     resultats, pagina = [], 1
     while True:
-        data = cima_get("presentaciones", {"sust": 4, "comerc": 1, "pagina": pagina})
+        data = cima_get("presentaciones", {"atc": "R03", "comerc": 1, "pagina": pagina})
         if not data: break
         items = data.get("resultados", [])
         if not items: break
@@ -155,7 +153,7 @@ def get_tots_inhaladors_cima():
         if len(resultats) >= total: break
         pagina += 1
         time.sleep(0.3)
-    print(f"  ✅ Total: {len(resultats)}")
+    print(f"  ✅ Total inhaladors R03: {len(resultats)}")
     return resultats
 
 def get_fitxa_posologia(nregistro):
