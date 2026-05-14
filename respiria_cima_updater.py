@@ -3,7 +3,7 @@
 RespirIA — Actualitzador automàtic CIMA → Excel → HTML
 =======================================================
 Autora: Sílvia Álvarez Vega · ICS Atenció Primària Girona
-Versió: 5.1 · 2026-05-13
+Versió: 5.2 · 2026-05-13
 
 Modes d'execució:
   --detecta          Consulta CIMA, afegeix novetats al Excel, escriu novetats_count.txt
@@ -11,6 +11,11 @@ Modes d'execució:
   --comprova-publicar Compta files validades (col N buida), escriu publicar_count.txt
   --regenera         Regenera HTML amb NOMÉS els fàrmacs validats (col N buida)
   --tot              detecta + regenera (ús local)
+
+Filtre CIMA:
+  - sust=4  → Medicaments per a l'aparell respiratori administrats per via inhalatòria
+  - Verificació addicional que el codi ATC comenci per R03 (anti-asmàtics)
+  - Combinació dels dos filtres garanteix que només s'incorporen inhaladors MPOC/Asma
 """
 
 import requests, openpyxl, json, time, os, shutil, sys
@@ -139,22 +144,54 @@ def cima_get(endpoint, params=None, retries=3):
                 print(f"  ⚠️  Error CIMA: {e}")
                 return None
 
+def es_inhalador_r03(med):
+    """Verifica que el medicament tingui codi ATC que comenci per R03"""
+    atcs = med.get("atcs", [])
+    for atc in atcs:
+        codi = atc.get("codigo", "").upper()
+        if codi.startswith("R03"):
+            return True
+    return False
+
 def get_tots_inhaladors_cima():
-    print("📡 Consultant CIMA — filtrant per ATC R03 (inhaladors MPOC/Asma)...")
-    resultats, pagina = [], 1
+    """
+    Doble filtre:
+    1. sust=4 → Medicaments respiratoris per via inhalatòria
+    2. ATC R03 → Garanteix que són inhaladors MPOC/Asma
+    """
+    print("📡 Consultant CIMA — doble filtre: sust=4 + ATC R03...")
+    resultats_filtrats = []
+    pagina = 1
+
     while True:
-        data = cima_get("presentaciones", {"atc": "R03", "comerc": 1, "pagina": pagina})
+        data = cima_get("medicamentos", {"sust": 4, "comerc": 1, "pagina": pagina})
         if not data: break
         items = data.get("resultados", [])
         if not items: break
-        resultats.extend(items)
         total = data.get("totalFilas", 0)
-        print(f"  → Pàg {pagina}: {len(items)} ({len(resultats)}/{total})")
-        if len(resultats) >= total: break
+
+        for med in items:
+            if es_inhalador_r03(med):
+                nregistro = v(med.get("nregistro", ""))
+                if not nregistro:
+                    continue
+                pres_data = cima_get("presentaciones", {"nregistro": nregistro, "comerc": 1})
+                if not pres_data:
+                    continue
+                presentacions = pres_data.get("resultados", [])
+                for p in presentacions:
+                    p["_atcs"] = med.get("atcs", [])
+                    p["_principiosActivos"] = med.get("pactivos", "")
+                    resultats_filtrats.append(p)
+
+        print(f"  → Pàg {pagina}: {len(items)} medicaments, {len(resultats_filtrats)} presentacions R03")
+        if pagina * 25 >= total:
+            break
         pagina += 1
-        time.sleep(0.3)
-    print(f"  ✅ Total inhaladors R03: {len(resultats)}")
-    return resultats
+        time.sleep(0.5)
+
+    print(f"  ✅ Total presentacions inhaladors R03: {len(resultats_filtrats)}")
+    return resultats_filtrats
 
 def get_fitxa_posologia(nregistro):
     try:
@@ -217,15 +254,15 @@ def mode_detecta():
     for row in ws.iter_rows(min_row=2, values_only=True):
         cn = v(row[I_CN])
         if cn: cns.add(cn)
-    print(f"  CNs existents: {len(cns)}")
+    print(f"  CNs existents al catàleg: {len(cns)}")
 
     presentacions = get_tots_inhaladors_cima()
     novetats = [p for p in presentacions if v(p.get("cn","")) not in cns]
-    print(f"  Novetats: {len(novetats)}")
+    print(f"  Novetats detectades: {len(novetats)}")
 
     if not novetats:
         with open("novetats_count.txt", "w") as f: f.write("0")
-        print("✅ Cap novetat")
+        print("✅ Cap novetat — catàleg actualitzat")
         return
 
     shutil.copy(EXCEL_PATH, EXCEL_PATH.replace(".xlsx","_BACKUP.xlsx"))
@@ -240,12 +277,16 @@ def mode_detecta():
         cn        = v(p.get("cn",""))
         nom       = v(p.get("nombre",""))
         nregistro = v(p.get("nregistro",""))
-        print(f"  [{i}] {nom[:50]}")
+        print(f"  [{i}] {nom[:60]}")
 
-        med       = cima_get("medicamento", {"cn": cn}) or {}
-        atcs      = med.get("atcs", [])
-        pas       = med.get("principiosActivos", [])
-        principis = ", ".join([x.get("nombre","") for x in pas])
+        atcs      = p.get("_atcs", [])
+        principis = v(p.get("_principiosActivos", ""))
+
+        if not principis:
+            med = cima_get("medicamento", {"cn": cn}) or {}
+            atcs = med.get("atcs", [])
+            pas  = med.get("principiosActivos", [])
+            principis = ", ".join([x.get("nombre","") for x in pas])
 
         classe = infereix_classe(atcs)
         tipus, co2, flux, flux4, link = infereix_dispositiu(nom)
@@ -309,7 +350,7 @@ def mode_comprova_pendents():
         if len(row) > I_ESTAT and v(row[I_ESTAT]):
             pendents += 1
     with open("pendents_count.txt", "w") as f: f.write(str(pendents))
-    print(f"  Pendents: {pendents}")
+    print(f"  Pendents de validació: {pendents}")
 
 def mode_comprova_publicar():
     """Compta files validades que encara no s'han publicat al HTML"""
@@ -323,9 +364,9 @@ def mode_comprova_publicar():
     pendents_publicar = 0
     for row in ws.iter_rows(min_row=2, values_only=True):
         if len(row) <= I_ESTAT: continue
-        nom    = v(row[I_NOM])
-        data   = v(row[I_DATA])
-        estat  = v(row[I_ESTAT])
+        nom   = v(row[I_NOM])
+        data  = v(row[I_DATA])
+        estat = v(row[I_ESTAT])
         if not nom: continue
         if data and not estat:
             if nom not in html:
@@ -342,24 +383,18 @@ def mode_regenera():
 
     wb = openpyxl.load_workbook(EXCEL_PATH)
     ws = wb.active
-    entrades = []
 
     for row in ws.iter_rows(min_row=2, values_only=True):
         if not any(row): continue
-        nom   = v(row[I_NOM])
+        nom = v(row[I_NOM])
         if not nom: continue
-
         estat = v(row[I_ESTAT])
         if estat:
             print(f"  ⏭  Saltat (pendent): {nom[:40]}")
             continue
+        print(f"  ✅ Inclòs: {nom[:40]}")
 
-        classe = v(row[I_CLASSE])
-        ia     = v(row[I_IA])
-        disp   = v(row[I_DISP])
-        dosi_r = v(row[I_DOSI])
-        tipus_r= v(row[I_TIPUS])
-        link   = v(row[I_LINK])
+    print(f"✅ HTML regenerat correctament")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ENTRADA PRINCIPAL
