@@ -3,7 +3,7 @@
 RespirIA — Actualitzador automàtic CIMA → Excel → HTML
 =======================================================
 Autora: Sílvia Álvarez Vega · ICS Atenció Primària Girona
-Versió: 5.4 · 2026-05-13
+Versió: 5.5 · 2026-05-14
 
 Modes d'execució:
   --detecta          Consulta CIMA, afegeix novetats al Excel, escriu novetats_count.txt
@@ -12,10 +12,10 @@ Modes d'execució:
   --regenera         Regenera HTML amb NOMÉS els fàrmacs validats (col N buida)
   --tot              detecta + regenera (ús local)
 
-Filtre CIMA:
-  - Cerca per cada principi actiu del catàleg (practiv1)
+Filtre CIMA v5.5:
+  - Cerca per codis ATC específics R03A i R03B (inhaladors MPOC/Asma)
+  - Dosis indexades per codi ATC → assignació sempre correcta
   - Filtre per paraules clau inhalatòries al nom de la presentació
-  - Garanteix que només s'incorporen inhaladors MPOC/Asma rellevants
 """
 
 import requests, openpyxl, json, time, os, shutil, sys
@@ -42,31 +42,127 @@ COLOR_NOU     = "FEF3C7"
 COLOR_ATENCIO = "FEE2E2"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PRINCIPIS ACTIUS A MONITORITZAR
+# CODIS ATC R03 — INHALADORS MPOC/ASMA
+# Font: CIMA REST API maestras?maestra=7&nombre=R03
 # ═══════════════════════════════════════════════════════════════════════════════
-PRINCIPIS_ACTIUS_CIMA = [
+CODIS_ATC = {
+    # ── SABA ──────────────────────────────────────────────────────────────────
+    "R03AC02": "SABA",   # Salbutamol
+    "R03AC03": "SABA",   # Terbutalina
+    "R03AC04": "SABA",   # Fenoterol
+    # ── LABA ──────────────────────────────────────────────────────────────────
+    "R03AC12": "LABA",   # Salmeterol
+    "R03AC13": "LABA",   # Formoterol
+    "R03AC18": "LABA",   # Indacaterol
+    "R03AC19": "LABA",   # Olodaterol
+    # ── SAMA ──────────────────────────────────────────────────────────────────
+    "R03BB01": "SAMA",   # Ipratropi
+    "R03BB02": "SAMA",   # Oxitropi
+    # ── LAMA ──────────────────────────────────────────────────────────────────
+    "R03BB04": "LAMA",   # Tiotropi
+    "R03BB05": "LAMA",   # Aclidini
+    "R03BB06": "LAMA",   # Glicopirroni
+    "R03BB07": "LAMA",   # Umeclidini
+    # ── GCI ───────────────────────────────────────────────────────────────────
+    "R03BA01": "GCI",    # Beclometasona
+    "R03BA02": "GCI",    # Budesonida
+    "R03BA05": "GCI",    # Fluticasona
+    "R03BA07": "GCI",    # Mometasona
+    "R03BA08": "GCI",    # Ciclesonida
+    # ── SABA/SAMA ─────────────────────────────────────────────────────────────
+    "R03AK03": "SABA/SAMA",  # Fenoterol + Ipratropi
+    "R03AL01": "SABA/SAMA",  # Fenoterol + Ipratropi
+    "R03AL02": "SABA/SAMA",  # Salbutamol + Ipratropi
+    # ── LABA/GCI ──────────────────────────────────────────────────────────────
+    "R03AK06": "LABA/GCI",  # Salmeterol + Fluticasona
+    "R03AK07": "LABA/GCI",  # Formoterol + Budesonida
+    "R03AK08": "LABA/GCI",  # Formoterol + Beclometasona
+    "R03AK09": "LABA/GCI",  # Formoterol + Mometasona
+    "R03AK10": "LABA/GCI",  # Vilanterol + Fluticasona furoat
+    "R03AK11": "LABA/GCI",  # Formoterol + Fluticasona
+    "R03AK14": "LABA/GCI",  # Indacaterol + Mometasona
+    # ── LABA/LAMA ─────────────────────────────────────────────────────────────
+    "R03AL03": "LABA/LAMA",  # Vilanterol + Umeclidini
+    "R03AL04": "LABA/LAMA",  # Indacaterol + Glicopirroni
+    "R03AL05": "LABA/LAMA",  # Formoterol + Aclidini
+    "R03AL06": "LABA/LAMA",  # Olodaterol + Tiotropi
+    # ── LAMA/LABA/GCI ─────────────────────────────────────────────────────────
+    "R03AL08": "LAMA/LABA/GCI",  # Vilanterol + Umeclidini + Fluticasona
+    "R03AL09": "LAMA/LABA/GCI",  # Formoterol + Glicopirroni + Beclometasona
+    "R03AL11": "LAMA/LABA/GCI",  # Formoterol + Glicopirroni + Budesonida
+    "R03AL12": "LAMA/LABA/GCI",  # Indacaterol + Glicopirroni + Mometasona
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DOSIS PER CODI ATC
+# Tupla: (dosi_mpoc, dosi_max, phf_star, matma)
+# La dosi és sempre la mateixa independentment del dispositiu
+# ═══════════════════════════════════════════════════════════════════════════════
+DOSIS_PER_ATC = {
     # SABA
-    "salbutamol", "terbutalina",
-    # SAMA
-    "ipratropio",
+    "R03AC02": ("100-200 µg si cal",   "200 µg/6h",            True,  False),  # Salbutamol
+    "R03AC03": ("500 µg si cal",        "6.000 µg/24h",         False, False),  # Terbutalina
+    "R03AC04": ("100-200 µg si cal",   "200 µg/6h",            False, False),  # Fenoterol
     # LABA
-    "formoterol", "salmeterol", "indacaterol", "olodaterol",
+    "R03AC12": ("50 µg/12h",            "100 µg/12h",           True,  False),  # Salmeterol
+    "R03AC13": ("12 µg/12h",            "24 µg/12h",            True,  False),  # Formoterol
+    "R03AC18": ("150 µg/24h",           "300 µg/24h",           True,  False),  # Indacaterol
+    "R03AC19": ("5 µg/24h",             "5 µg/24h",             False, False),  # Olodaterol
+    # SAMA
+    "R03BB01": ("40 µg si cal",         "240 µg/24h",           True,  False),  # Ipratropi
+    "R03BB02": ("200 µg si cal",        "800 µg/24h",           False, False),  # Oxitropi
     # LAMA
-    "tiotropio", "glicopirronio", "umeclidinio", "aclidinio",
+    "R03BB04": ("18 µg/24h (Handihaler) / 5 µg/24h (Respimat) / 10 µg/24h (Zonda)", "= pauta", True, False),  # Tiotropi
+    "R03BB05": ("322 µg/12h",           "322 µg/12h",           False, False),  # Aclidini
+    "R03BB06": ("44 µg/24h",            "44 µg/24h",            False, False),  # Glicopirroni
+    "R03BB07": ("55 µg/24h",            "55 µg/24h",            False, False),  # Umeclidini
     # GCI
-    "fluticasona", "budesonida", "beclometasona", "ciclesonida", "mometasona",
-    # LABA/LAMA
-    "indacaterol, glicopirronio", "umeclidinio, vilanterol",
-    "tiotropio, olodaterol", "aclidinio, formoterol",
+    "R03BA01": ("250-500 µg/12h",       "1.000 µg/12h",         False, False),  # Beclometasona
+    "R03BA02": ("200-400 µg/12h",       "800 µg/12h",           False, False),  # Budesonida
+    "R03BA05": ("250-500 µg/12h",       "500 µg/12h",           False, False),  # Fluticasona
+    "R03BA07": ("200 µg/24h",           "800 µg/24h",           False, False),  # Mometasona
+    "R03BA08": ("80-160 µg/24h",        "1.280 µg/24h",         False, False),  # Ciclesonida
+    # SABA/SAMA
+    "R03AK03": ("100-200/40 µg si cal", "200/240 µg/24h",       False, False),  # Fenoterol+Ipratropi
+    "R03AL01": ("100-200/40 µg si cal", "200/240 µg/24h",       False, False),  # Fenoterol+Ipratropi
+    "R03AL02": ("100-200/40 µg si cal", "200/240 µg/24h",       False, False),  # Salbutamol+Ipratropi
     # LABA/GCI
-    "salmeterol, fluticasona", "formoterol, budesonida",
-    "formoterol, beclometasona", "vilanterol, fluticasona",
+    "R03AK06": ("50/500 µg/12h",        "50/500 µg/12h",        False, False),  # Salmeterol+Fluticasona
+    "R03AK07": ("9/320 µg/12h",         "36/1.280 µg/24h",      False, False),  # Formoterol+Budesonida
+    "R03AK08": ("12/200 µg/12h",        "12/400 µg/12h",        False, False),  # Formoterol+Beclometasona
+    "R03AK09": ("5/200 µg/24h",         "5/400 µg/24h",         False, False),  # Formoterol+Mometasona
+    "R03AK10": ("22/92 µg/24h",         "22/184 µg/24h",        False, False),  # Vilanterol+Fluticasona
+    "R03AK11": ("5/125 µg/12h",         "5/250 µg/12h",         False, False),  # Formoterol+Fluticasona
+    "R03AK14": ("150/160 µg/24h",       "150/160 µg/24h",       False, False),  # Indacaterol+Mometasona
+    # LABA/LAMA
+    "R03AL03": ("22/55 µg/24h",         "22/55 µg/24h",         False, False),  # Vilanterol+Umeclidini
+    "R03AL04": ("150/50 µg/24h",        "150/50 µg/24h",        True,  False),  # Indacaterol+Glicopirroni
+    "R03AL05": ("12/340 µg/12h",        "12/340 µg/12h",        False, False),  # Formoterol+Aclidini
+    "R03AL06": ("5/5 µg/24h",           "5/5 µg/24h",           False, False),  # Olodaterol+Tiotropi
     # LAMA/LABA/GCI
-    "beclometasona, formoterol, glicopirronio",
-    "fluticasona, umeclidinio, vilanterol",
-    "budesonida, formoterol, glicopirronio",
-    "mometasona, indacaterol, glicopirronio",
-]
+    "R03AL08": ("22/55/92 µg/24h",      "22/55/184 µg/24h",     False, True),   # Vilanterol+Umeclidini+Fluticasona
+    "R03AL09": ("10/18/174 µg/12h",     "10/18/344 µg/12h",     False, True),   # Formoterol+Glicopirroni+Beclometasona
+    "R03AL11": ("10/160/14.4 µg/12h",   "10/160/14.4 µg/12h",   False, True),   # Formoterol+Glicopirroni+Budesonida
+    "R03AL12": ("150/50/160 µg/24h",    "150/50/160 µg/24h",    False, True),   # Indacaterol+Glicopirroni+Mometasona
+}
+
+# Dosis asma GCI per escalons (baixa/mitjana/alta)
+DOSIS_ASMA_GCI = {
+    "R03BA01": ("200-500 µg/24h",  "501-1.000 µg/24h", "1.001-2.000 µg/24h"),  # Beclometasona
+    "R03BA02": ("200-400 µg/24h",  "401-800 µg/24h",   "801-1.600 µg/24h"),    # Budesonida
+    "R03BA05": ("100-250 µg/24h",  "251-500 µg/24h",   "501-1.000 µg/24h"),    # Fluticasona
+    "R03BA07": ("200 µg/24h",      "400 µg/24h",       "800 µg/24h"),           # Mometasona
+    "R03BA08": ("80-160 µg/24h",   "161-320 µg/24h",   "321-1.280 µg/24h"),    # Ciclesonida
+}
+
+# Dosis asma combinacions per escalons (baixa/mitjana/alta)
+DOSIS_ASMA_COMBO = {
+    "R03AK06": ("50/100 µg/12h",    "50/250 µg/12h",    "50/500 µg/12h"),       # Salmeterol+Fluticasona
+    "R03AK07": ("4.5/160 µg/12h",   "9/320 µg/12h",     "2 inh 9/320 µg/12h"), # Formoterol+Budesonida
+    "R03AK08": ("6/100: 1 inh/12h", "6/100: 2 inh/12h", "6/200: 2 inh/12h"),   # Formoterol+Beclometasona
+    "R03AK10": ("22/92 µg/24h",     "22/92 µg/24h",     "22/184 µg/24h"),       # Vilanterol+Fluticasona
+    "R03AK11": ("5/100 µg/12h",     "5/250 µg/12h",     "5/500 µg/12h"),        # Formoterol+Fluticasona
+}
 
 # Paraules clau que identifiquen una presentació com a inhalatòria
 PARAULES_INHALATORI = [
@@ -80,66 +176,6 @@ PARAULES_INHALATORI = [
     "nebulizacion", "nebulizador",
 ]
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# DOSIS PHF CatSalut 2018 + GEMA 5.5
-# ═══════════════════════════════════════════════════════════════════════════════
-DOSIS_MPOC = {
-    "salbutamol":               ("100-200 µg si cal",    "200 µg/6h",       True,  False),
-    "terbutalina":              ("500 µg si cal",         "6.000 µg/24h",    False, False),
-    "ipratropi":                ("40 µg si cal",          "240 µg/24h",      True,  False),
-    "formoterol":               ("12 µg/12h",             "24 µg/12h",       True,  False),
-    "salmeterol":               ("50 µg/12h",             "100 µg/12h",      True,  False),
-    "indacaterol":              ("150 µg/24h",            "300 µg/24h",      True,  False),
-    "olodaterol":               ("5 µg/24h",              "5 µg/24h",        False, False),
-    "tiotropi":                 ("18 µg/24h (Handihaler) / 5 µg/24h (Respimat) / 10 µg/24h (Zonda)",
-                                 "= pauta",               True,  False),
-    "glicopirroni":             ("44 µg/24h",             "44 µg/24h",       False, False),
-    "umeclidini":               ("55 µg/24h",             "55 µg/24h",       False, False),
-    "aclidini":                 ("322 µg/12h",            "322 µg/12h",      False, False),
-    "indacaterol/glicopirroni": ("85/43 µg/24h",          "85/43 µg/24h",    True,  False),
-    "tiotropi/olodaterol":      ("5/5 µg/24h",            "5/5 µg/24h",      False, False),
-    "umeclidini/vilanterol":    ("55/22 µg/24h",          "55/22 µg/24h",    False, False),
-    "aclidini/formoterol":      ("340/12 µg/12h",         "340/12 µg/12h",   False, False),
-    "salmeterol/fluticasona":   ("50/500 µg/12h",         "50/500 µg/12h",   False, False),
-    "formoterol/budesonida":    ("9/320 µg/12h",          "36/1.280 µg/24h", False, False),
-    "formoterol/beclometasona": ("12/200 µg/12h",         "12/400 µg/12h",   False, False),
-    "vilanterol/fluticasona":   ("22/92 µg/24h",          "22/184 µg/24h",   False, False),
-    "fluticasona":              ("250-500 µg/12h",         "500 µg/12h",      False, False),
-    "budesonida":               ("200-400 µg/12h",         "800 µg/12h",      False, False),
-    "beclometasona":            ("250-500 µg/12h",         "1.000 µg/12h",    False, False),
-    "beclometasona/formoterol/glicopirroni": ("174/10/18 µg/12h","18/10/344 µg/12h",False,True),
-    "fluticasona/umeclidini/vilanterol":     ("92/55/22 µg/24h","184/55/22 µg/24h",False,True),
-    "budesonida/formoterol/glicopirroni":    ("160/10/14.4 µg/12h","160/10/14.4 µg/12h",False,True),
-    "mometasona/indacaterol/glicopirroni":   ("136/150/50 µg/24h","136/150/50 µg/24h",False,True),
-}
-DOSIS_ASMA_GCI = {
-    "budesonida":             ("200-400 µg/24h",  "401-800 µg/24h",   "801-1.600 µg/24h"),
-    "beclometasona":          ("200-500 µg/24h",  "501-1.000 µg/24h", "1.001-2.000 µg/24h"),
-    "beclometasona extrafina":("100-200 µg/24h",  "201-400 µg/24h",   ">400 µg/24h"),
-    "ciclesonida":            ("80-160 µg/24h",   "161-320 µg/24h",   "321-1.280 µg/24h"),
-    "fluticasona propionat":  ("100-250 µg/24h",  "251-500 µg/24h",   "501-1.000 µg/24h"),
-    "fluticasona furoat":     ("92 µg/24h",        "92 µg/24h",        "184 µg/24h"),
-    "mometasona":             ("200 µg/24h",       "400 µg/24h",       "800 µg/24h"),
-}
-DOSIS_ASMA_COMBO = {
-    "salmeterol/fluticasona":   ("50/100 µg/12h",    "50/250 µg/12h",    "50/500 µg/12h"),
-    "formoterol/budesonida":    ("4.5/160 µg/12h",   "9/320 µg/12h",     "2 inh de 9/320 µg/12h"),
-    "formoterol/beclometasona": ("6/100: 1 inh/12h", "6/100: 2 inh/12h", "6/200: 2 inh/12h"),
-    "vilanterol/fluticasona":   ("22/92 µg/24h",     "22/92 µg/24h",     "22/184 µg/24h"),
-}
-ATC_A_CLASSE = {
-    "R03AC02":"SABA","R03AC03":"SABA","R03AC04":"SABA",
-    "R03AC12":"LABA","R03AC13":"LABA","R03AC18":"LABA","R03AC19":"LABA","R03AC20":"LABA",
-    "R03BB01":"SAMA","R03BB04":"LAMA","R03BB05":"LAMA","R03BB06":"LAMA","R03BB07":"LAMA",
-    "R03BA01":"GCI","R03BA02":"GCI","R03BA05":"GCI","R03BA07":"GCI","R03BA08":"GCI","R03BA09":"GCI",
-    "R03AL02":"LABA/LAMA","R03AL03":"LABA/LAMA","R03AL04":"LABA/LAMA","R03AL05":"LABA/LAMA",
-    "R03AL06":"LABA/LAMA","R03AL09":"LABA/LAMA",
-    "R03AK01":"SABA/GCI",
-    "R03AK06":"LABA/GCI","R03AK07":"LABA/GCI","R03AK08":"LABA/GCI",
-    "R03AK10":"LABA/GCI","R03AK11":"LABA/GCI","R03AK12":"LABA/GCI","R03AK13":"LABA/GCI",
-    "R03AL08":"LAMA/LABA/GCI","R03AL10":"LAMA/LABA/GCI",
-    "R03AL11":"LAMA/LABA/GCI","R03AL12":"LAMA/LABA/GCI",
-}
 DISPOSITIU_MAP = {
     "turbuhaler":  ("IPS-multi","🟢","50-60 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11893"),
     "accuhaler":   ("IPS-multi","🟢","60-90 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11813"),
@@ -160,6 +196,7 @@ DISPOSITIU_MAP = {
     "aerosphere":  ("ICP",     "🔴","20-30 l/m","Lenta", "https://scientiasalut.gencat.cat/handle/11351/11880"),
     "inhalacion en envase a presion":("ICP","🔴","20-30 l/m","Lenta","https://scientiasalut.gencat.cat/handle/11351/11880"),
     "suspension para inhalacion":    ("ICP","🔴","20-30 l/m","Lenta","https://scientiasalut.gencat.cat/handle/11351/11880"),
+    "solucion para inhalacion":      ("ICP","🔴","20-30 l/m","Lenta","https://scientiasalut.gencat.cat/handle/11351/11880"),
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -190,22 +227,22 @@ def es_inhalatori(nom):
 
 def get_tots_inhaladors_cima():
     """
-    Cerca per cada principi actiu del catàleg.
-    Filtra per paraules clau inhalatòries al nom de la presentació.
-    Garanteix que només s'incorporen inhaladors MPOC/Asma rellevants.
+    Cerca per cada codi ATC R03 rellevant.
+    La classe terapèutica ve directament del codi ATC — sempre correcta.
+    Filtre addicional per paraules clau inhalatòries.
     """
-    print("📡 Consultant CIMA — cerca per principis actius + filtre inhalatori...")
+    print("📡 Consultant CIMA — cerca per codis ATC R03...")
     resultats_filtrats = []
     cns_vistos = set()
 
-    for principi in PRINCIPIS_ACTIUS_CIMA:
-        print(f"  🔍 {principi}...")
+    for codi_atc, classe in CODIS_ATC.items():
+        print(f"  🔍 {codi_atc} ({classe})...")
         pagina = 1
-        trobats_principi = 0
+        trobats = 0
 
         while True:
             data = cima_get("medicamentos", {
-                "practiv1": principi,
+                "atc": codi_atc,
                 "comerc": 1,
                 "pagina": pagina
             })
@@ -227,16 +264,18 @@ def get_tots_inhaladors_cima():
                     nom = v(p.get("nombre", ""))
                     if cn and cn not in cns_vistos and es_inhalatori(nom):
                         cns_vistos.add(cn)
-                        p["_principiosActivos"] = med.get("pactivos", principi)
+                        p["_classe"]          = classe
+                        p["_atc"]             = codi_atc
+                        p["_principiosActivos"] = med.get("pactivos", "")
                         resultats_filtrats.append(p)
-                        trobats_principi += 1
+                        trobats += 1
 
             if pagina * 25 >= total: break
             pagina += 1
             time.sleep(0.3)
 
-        if trobats_principi > 0:
-            print(f"    → {trobats_principi} inhaladors trobats")
+        if trobats > 0:
+            print(f"    → {trobats} inhaladors trobats")
         time.sleep(0.3)
 
     print(f"  ✅ Total inhaladors: {len(resultats_filtrats)}")
@@ -250,44 +289,41 @@ def get_fitxa_posologia(nregistro):
         return soup.get_text(separator=" ", strip=True)[:400]
     except: return ""
 
-def normalitza(text):
-    t = str(text).lower()
-    for p in ["bromur de ","bromur d'","propionat de ","furoat de ","dipropionat de "]:
-        t = t.replace(p, "")
-    return t.strip()
-
-def cerca_dosi_mpoc(principis):
-    ia = normalitza(principis)
-    if ia in DOSIS_MPOC: return DOSIS_MPOC[ia]
-    primer = ia.split("/")[0].strip().split(" ")[0]
-    for k, val in DOSIS_MPOC.items():
-        if primer in k: return val
-    return None
-
-def cerca_asma_gci(principis):
-    ia = normalitza(principis)
-    for k, val in DOSIS_ASMA_GCI.items():
-        if k in ia or ia in k: return val
-    return None
-
-def cerca_asma_combo(principis):
-    ia = normalitza(principis)
-    for k, val in DOSIS_ASMA_COMBO.items():
-        if k in ia or ia in k: return val
-    return None
-
-def infereix_classe(atcs):
-    for atc in (atcs or []):
-        c = atc.get("codigo","").upper()
-        if c in ATC_A_CLASSE: return ATC_A_CLASSE[c]
-        if c[:7] in ATC_A_CLASSE: return ATC_A_CLASSE[c[:7]]
-    return "PENDENT"
-
 def infereix_dispositiu(nom):
     nl = str(nom).lower()
     for k, val in DISPOSITIU_MAP.items():
         if k in nl: return val
     return ("ICP","🔴","20-30 l/m","Lenta","https://scientiasalut.gencat.cat/handle/11351/11880")
+
+def construeix_dosi(codi_atc, nregistro):
+    """
+    Construeix el text de dosi a partir del codi ATC.
+    La dosi és sempre la mateixa independentment del dispositiu.
+    """
+    dosi_text = ""
+    phf_val   = ""
+    matma_val = ""
+    color_atencio = False
+
+    if codi_atc in DOSIS_PER_ATC:
+        dosi_mpoc, dmx, starred, matma = DOSIS_PER_ATC[codi_atc]
+        dosi_text = f"MPOC: {dosi_mpoc}\nD.màx: {dmx}"
+        if starred: phf_val   = "★"
+        if matma:   matma_val = "MATMA"
+
+    if codi_atc in DOSIS_ASMA_GCI:
+        b, m, a = DOSIS_ASMA_GCI[codi_atc]
+        dosi_text += f"\nAsma baixa: {b}\nAsma mitjana: {m}\nAsma alta: {a}"
+    elif codi_atc in DOSIS_ASMA_COMBO:
+        b, m, a = DOSIS_ASMA_COMBO[codi_atc]
+        dosi_text += f"\nAsma baixa: {b}\nAsma mitjana: {m}\nAsma alta: {a}"
+
+    if not dosi_text:
+        posologia = get_fitxa_posologia(nregistro)
+        dosi_text = f"FITXA TÈCNICA: {posologia[:200]}" if posologia else "PENDENT — consultar fitxa CIMA"
+        color_atencio = True
+
+    return dosi_text, phf_val, matma_val, color_atencio
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MODES D'EXECUCIÓ
@@ -326,41 +362,14 @@ def mode_detecta():
         cn        = v(p.get("cn",""))
         nom       = v(p.get("nombre",""))
         nregistro = v(p.get("nregistro",""))
-        print(f"  [{i}] {nom[:60]}")
-
+        codi_atc  = p.get("_atc", "")
+        classe    = p.get("_classe", "PENDENT")
         principis = v(p.get("_principiosActivos", ""))
-        med_full  = cima_get("medicamento", {"cn": cn}) or {}
-        atcs      = med_full.get("atcs", [])
-        if not principis:
-            pas       = med_full.get("principiosActivos", [])
-            principis = ", ".join([x.get("nombre","") for x in pas])
+        print(f"  [{i}] {nom[:60]} ({codi_atc})")
 
-        classe = infereix_classe(atcs)
         tipus, co2, flux, flux4, link = infereix_dispositiu(nom)
-
-        dosi_info  = cerca_dosi_mpoc(principis)
-        asma_gci   = cerca_asma_gci(principis)
-        asma_combo = cerca_asma_combo(principis)
-
-        dosi_text = ""
-        phf_val = matma_val = ""
-        color = fill_nou
-
-        if dosi_info:
-            dosi_mpoc, dmx, starred, matma = dosi_info
-            dosi_text = f"MPOC: {dosi_mpoc}\nD.màx: {dmx}"
-            if starred:  phf_val   = "★"
-            if matma:    matma_val = "MATMA"
-
-        if asma_gci:
-            dosi_text += f"\nAsma baixa: {asma_gci[0]}\nAsma mitjana: {asma_gci[1]}\nAsma alta: {asma_gci[2]}"
-        elif asma_combo:
-            dosi_text += f"\nAsma baixa: {asma_combo[0]}\nAsma mitjana: {asma_combo[1]}\nAsma alta: {asma_combo[2]}"
-
-        if not dosi_text:
-            posologia = get_fitxa_posologia(nregistro)
-            dosi_text = f"FITXA TÈCNICA: {posologia[:200]}" if posologia else "PENDENT — consultar fitxa CIMA"
-            color = fill_atencio
+        dosi_text, phf_val, matma_val, color_atencio = construeix_dosi(codi_atc, nregistro)
+        color = fill_atencio if color_atencio else fill_nou
 
         fila = [
             classe, principis, nom, cn, nom,
