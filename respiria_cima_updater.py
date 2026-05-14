@@ -3,7 +3,7 @@
 RespirIA — Actualitzador automàtic CIMA → Excel → HTML
 =======================================================
 Autora: Sílvia Álvarez Vega · ICS Atenció Primària Girona
-Versió: 5.3 · 2026-05-13
+Versió: 5.4 · 2026-05-13
 
 Modes d'execució:
   --detecta          Consulta CIMA, afegeix novetats al Excel, escriu novetats_count.txt
@@ -13,9 +13,9 @@ Modes d'execució:
   --tot              detecta + regenera (ús local)
 
 Filtre CIMA:
-  - Cerca directament per cada principi actiu del catàleg (practiv1)
-  - Combinat amb sust=4 per garantir via inhalatòria
-  - Resultat: només inhaladors MPOC/Asma rellevants
+  - Cerca per cada principi actiu del catàleg (practiv1)
+  - Filtre per paraules clau inhalatòries al nom de la presentació
+  - Garanteix que només s'incorporen inhaladors MPOC/Asma rellevants
 """
 
 import requests, openpyxl, json, time, os, shutil, sys
@@ -66,6 +66,18 @@ PRINCIPIS_ACTIUS_CIMA = [
     "fluticasona, umeclidinio, vilanterol",
     "budesonida, formoterol, glicopirronio",
     "mometasona, indacaterol, glicopirronio",
+]
+
+# Paraules clau que identifiquen una presentació com a inhalatòria
+PARAULES_INHALATORI = [
+    "inhal", "turbuhaler", "accuhaler", "genuair", "ellipta",
+    "novolizer", "easyhaler", "nexthaler", "spiromax", "forspiro",
+    "twisthaler", "breezhaler", "aerolizer", "handihaler", "zonda",
+    "respimat", "modulite", "aerosphere", "evohaler", "autohaler",
+    "clickhaler", "pulvinal", "diskus", "aerocaps",
+    "polvo para inhalacion", "polvo inhalacion",
+    "suspension para inhalacion", "solucion para inhalacion",
+    "nebulizacion", "nebulizador",
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -171,22 +183,29 @@ def cima_get(endpoint, params=None, retries=3):
                 print(f"  ⚠️  Error CIMA: {e}")
                 return None
 
+def es_inhalatori(nom):
+    """Comprova que el nom de la presentació indica via inhalatòria"""
+    nl = nom.lower()
+    return any(p in nl for p in PARAULES_INHALATORI)
+
 def get_tots_inhaladors_cima():
     """
-    Cerca per cada principi actiu del catàleg combinat amb sust=4.
-    Garanteix que només es troben inhaladors MPOC/Asma rellevants.
+    Cerca per cada principi actiu del catàleg.
+    Filtra per paraules clau inhalatòries al nom de la presentació.
+    Garanteix que només s'incorporen inhaladors MPOC/Asma rellevants.
     """
-    print("📡 Consultant CIMA — cerca per principis actius + sust=4...")
+    print("📡 Consultant CIMA — cerca per principis actius + filtre inhalatori...")
     resultats_filtrats = []
     cns_vistos = set()
 
     for principi in PRINCIPIS_ACTIUS_CIMA:
         print(f"  🔍 {principi}...")
         pagina = 1
+        trobats_principi = 0
+
         while True:
             data = cima_get("medicamentos", {
                 "practiv1": principi,
-                "sust": 4,
                 "comerc": 1,
                 "pagina": pagina
             })
@@ -198,21 +217,29 @@ def get_tots_inhaladors_cima():
             for med in items:
                 nregistro = v(med.get("nregistro", ""))
                 if not nregistro: continue
-                pres_data = cima_get("presentaciones", {"nregistro": nregistro, "comerc": 1})
+                pres_data = cima_get("presentaciones", {
+                    "nregistro": nregistro,
+                    "comerc": 1
+                })
                 if not pres_data: continue
                 for p in pres_data.get("resultados", []):
-                    cn = v(p.get("cn", ""))
-                    if cn and cn not in cns_vistos:
+                    cn  = v(p.get("cn", ""))
+                    nom = v(p.get("nombre", ""))
+                    if cn and cn not in cns_vistos and es_inhalatori(nom):
                         cns_vistos.add(cn)
                         p["_principiosActivos"] = med.get("pactivos", principi)
                         resultats_filtrats.append(p)
+                        trobats_principi += 1
 
             if pagina * 25 >= total: break
             pagina += 1
             time.sleep(0.3)
+
+        if trobats_principi > 0:
+            print(f"    → {trobats_principi} inhaladors trobats")
         time.sleep(0.3)
 
-    print(f"  ✅ Total presentacions trobades: {len(resultats_filtrats)}")
+    print(f"  ✅ Total inhaladors: {len(resultats_filtrats)}")
     return resultats_filtrats
 
 def get_fitxa_posologia(nregistro):
@@ -302,14 +329,11 @@ def mode_detecta():
         print(f"  [{i}] {nom[:60]}")
 
         principis = v(p.get("_principiosActivos", ""))
+        med_full  = cima_get("medicamento", {"cn": cn}) or {}
+        atcs      = med_full.get("atcs", [])
         if not principis:
-            med = cima_get("medicamento", {"cn": cn}) or {}
-            pas = med.get("principiosActivos", [])
+            pas       = med_full.get("principiosActivos", [])
             principis = ", ".join([x.get("nombre","") for x in pas])
-
-        atcs = []
-        med_full = cima_get("medicamento", {"cn": cn}) or {}
-        atcs = med_full.get("atcs", [])
 
         classe = infereix_classe(atcs)
         tipus, co2, flux, flux4, link = infereix_dispositiu(nom)
