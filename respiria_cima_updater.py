@@ -3,17 +3,19 @@
 RespirIA — Actualitzador automàtic CIMA → Excel → HTML
 =======================================================
 Autora: Sílvia Álvarez Vega · ICS Atenció Primària Girona
-Versió: 5.7 · 2026-05-14
+Versió: 5.8 · 2026-05-14
 
-Canvis v5.7:
-  - Detecció automàtica de nebulitzadors → col N = "NO INCORPORAR — nebulitzador"
-  - Fallback principi actiu: vtm.nombre → pactivos → diccionari per codi ATC
-  - Nebulitzadors classificats com NEB (no ICP)
-  - Normalització CNs (elimina decimals)
-  - Tots els canvis de v5.6 mantinguts
+Canvis v5.8 — consulta definitiva:
+  - UNA SOLA consulta: vias=78 (inhalatoria) + atc=R03 + comerc=1
+  - Retorna 341 medicaments — tots els inhaladors MPOC/Asma comercialitzats
+  - Filtre per formaFarmaceutica: exclou nebulitzadors automàticament
+  - Classe terapèutica des del codi ATC del medicament (sempre correcta)
+  - Principi actiu des de vtm.nombre (complet per a combinacions)
+  - Dispositiu des de formaFarmaceutica.nombre (detecta UNIDOSIS)
+  - Dosi des del diccionari per codi ATC (sempre correcta)
 """
 
-import requests, openpyxl, time, os, shutil, sys
+import requests, openpyxl, time, shutil, sys
 from datetime import datetime
 from bs4 import BeautifulSoup
 from openpyxl.styles import PatternFill, Font, Alignment
@@ -32,75 +34,120 @@ I_FLUX   = 8;  I_FLUX4 = 9; I_LINK = 10
 I_DATA   = 11; I_ORIGEN = 12; I_ESTAT = 13
 I_PHF    = 14; I_MATMA = 15
 
-COLOR_NOU     = "FEF3C7"
-COLOR_ATENCIO = "FEE2E2"
-COLOR_NO_INC  = "F3F4F6"
+COLOR_NOU     = "FEF3C7"   # groc = pendent validació
+COLOR_ATENCIO = "FEE2E2"   # vermell = dosi no trobada
+COLOR_NO_INC  = "F3F4F6"   # gris = no incorporar (nebulitzador)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CODIS ATC R03
+# FORMES FARMACÈUTIQUES → TIPUS DISPOSITIU
+# Font: DICCIONARIO_FORMA_FARMACEUTICA.xml de la CIMA
 # ═══════════════════════════════════════════════════════════════════════════════
-CODIS_ATC = {
-    "R03AC02": "SABA",        "R03AC03": "SABA",        "R03AC04": "SABA",
-    "R03AC12": "LABA",        "R03AC13": "LABA",
-    "R03AC18": "LABA",        "R03AC19": "LABA",
-    "R03BB01": "SAMA",        "R03BB02": "SAMA",
-    "R03BB04": "LAMA",        "R03BB05": "LAMA",
-    "R03BB06": "LAMA",        "R03BB07": "LAMA",
-    "R03BA01": "GCI",         "R03BA02": "GCI",
-    "R03BA05": "GCI",         "R03BA07": "GCI",         "R03BA08": "GCI",
-    "R03AK03": "SABA/SAMA",   "R03AL01": "SABA/SAMA",   "R03AL02": "SABA/SAMA",
-    "R03AK06": "LABA/GCI",    "R03AK07": "LABA/GCI",    "R03AK08": "LABA/GCI",
-    "R03AK09": "LABA/GCI",    "R03AK10": "LABA/GCI",    "R03AK11": "LABA/GCI",
-    "R03AK14": "LABA/GCI",
-    "R03AL03": "LABA/LAMA",   "R03AL04": "LABA/LAMA",
-    "R03AL05": "LABA/LAMA",   "R03AL06": "LABA/LAMA",
-    "R03AL08": "LAMA/LABA/GCI", "R03AL09": "LAMA/LABA/GCI",
-    "R03AL11": "LAMA/LABA/GCI", "R03AL12": "LAMA/LABA/GCI",
+
+# Formes que SÍ incorporem al prescriptor AP
+FORMES_PRESCRIPTOR = {
+    "SUSPENSIÓN PARA INHALACIÓN EN ENVASE A PRESIÓN": (
+        "ICP", "🔴", "20-30 l/m", "Lenta",
+        "https://scientiasalut.gencat.cat/handle/11351/11880"),
+    "SOLUCIÓN PARA INHALACIÓN EN ENVASE A PRESIÓN": (
+        "ICP", "🔴", "20-30 l/m", "Lenta",
+        "https://scientiasalut.gencat.cat/handle/11351/11880"),
+    "POLVO PARA INHALACIÓN": (
+        "IPS-multi", "🟢", "Variable", "Ràpida",
+        "https://scientiasalut.gencat.cat/handle/11351/11881"),
+    "POLVO PARA INHALACIÓN (UNIDOSIS)": (
+        "IPS-uni", "🟢", "Variable", "Ràpida",
+        "https://scientiasalut.gencat.cat/handle/11351/11816"),
+    "POLVO PARA INHALACIÓN (CÁPSULA DURA)": (
+        "IPS-uni", "🟢", "Variable", "Ràpida",
+        "https://scientiasalut.gencat.cat/handle/11351/11816"),
+    "SOLUCIÓN PARA INHALACIÓN": (
+        "IVS", "🟢", "20-30 l/m", "Lenta",
+        "https://scientiasalut.gencat.cat/handle/11351/11891"),
+    "SOLUCIÓN PARA INHALACIÓN DEL VAPOR": (
+        "IVS", "🟢", "20-30 l/m", "Lenta",
+        "https://scientiasalut.gencat.cat/handle/11351/11891"),
+    "LÍQUIDO PARA INHALACIÓN DEL VAPOR": (
+        "IVS", "🟢", "20-30 l/m", "Lenta",
+        "https://scientiasalut.gencat.cat/handle/11351/11891"),
 }
 
-# Principi actiu per defecte quan vtm.nombre és buit
+# Formes que NO incorporem (nebulitzadors i altres)
+FORMES_NO_INCORPORAR = [
+    "NEBULIZADOR",
+    "NEBULIZACIÓN",
+    "GAS PARA INHALACION",
+    "POLVO Y DISOLVENTE PARA SOLUCIÓN PARA INHALACIÓN",
+    "SOLUCIÓN ORAL O CONCENTRADO PARA INHALACIÓN",
+]
+
+# Refinament del link d'instruccions pel nom del dispositiu
+DISPOSITIU_LINK_MAP = {
+    "turbuhaler":  "https://scientiasalut.gencat.cat/handle/11351/11893",
+    "accuhaler":   "https://scientiasalut.gencat.cat/handle/11351/11813",
+    "genuair":     "https://scientiasalut.gencat.cat/handle/11351/11878",
+    "ellipta":     "https://scientiasalut.gencat.cat/handle/11351/11818",
+    "novolizer":   "https://scientiasalut.gencat.cat/handle/11351/11882",
+    "easyhaler":   "https://scientiasalut.gencat.cat/handle/11351/11817",
+    "nexthaler":   "https://scientiasalut.gencat.cat/handle/11351/11881",
+    "spiromax":    "https://scientiasalut.gencat.cat/handle/11351/11892",
+    "forspiro":    "https://scientiasalut.gencat.cat/handle/11351/11819",
+    "twisthaler":  "https://scientiasalut.gencat.cat/handle/11351/11894",
+    "breezhaler":  "https://scientiasalut.gencat.cat/handle/11351/11816",
+    "aerolizer":   "https://scientiasalut.gencat.cat/handle/11351/11815",
+    "handihaler":  "https://scientiasalut.gencat.cat/handle/11351/11879",
+    "zonda":       "https://scientiasalut.gencat.cat/handle/11351/11895",
+    "respimat":    "https://scientiasalut.gencat.cat/handle/11351/11891",
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAPES ATC → CLASSE TERAPÈUTICA + PRINCIPI ACTIU + DOSIS
+# ═══════════════════════════════════════════════════════════════════════════════
+ATC_A_CLASSE = {
+    "R03AC02":"SABA", "R03AC03":"SABA", "R03AC04":"SABA",
+    "R03AC12":"LABA", "R03AC13":"LABA", "R03AC18":"LABA", "R03AC19":"LABA",
+    "R03BB01":"SAMA", "R03BB02":"SAMA",
+    "R03BB04":"LAMA", "R03BB05":"LAMA", "R03BB06":"LAMA", "R03BB07":"LAMA",
+    "R03BA01":"GCI",  "R03BA02":"GCI",  "R03BA05":"GCI",
+    "R03BA07":"GCI",  "R03BA08":"GCI",
+    "R03AK03":"SABA/SAMA", "R03AL01":"SABA/SAMA", "R03AL02":"SABA/SAMA",
+    "R03AK06":"LABA/GCI",  "R03AK07":"LABA/GCI",  "R03AK08":"LABA/GCI",
+    "R03AK09":"LABA/GCI",  "R03AK10":"LABA/GCI",  "R03AK11":"LABA/GCI",
+    "R03AK14":"LABA/GCI",
+    "R03AL03":"LABA/LAMA", "R03AL04":"LABA/LAMA",
+    "R03AL05":"LABA/LAMA", "R03AL06":"LABA/LAMA",
+    "R03AL08":"LAMA/LABA/GCI", "R03AL09":"LAMA/LABA/GCI",
+    "R03AL11":"LAMA/LABA/GCI", "R03AL12":"LAMA/LABA/GCI",
+}
+
 PRINCIPI_PER_ATC = {
-    "R03AC02": "salbutamol",
-    "R03AC03": "terbutalina",
-    "R03AC04": "fenoterol",
-    "R03AC12": "salmeterol",
-    "R03AC13": "formoterol",
-    "R03AC18": "indacaterol",
-    "R03AC19": "olodaterol",
-    "R03BB01": "ipratropio",
-    "R03BB02": "oxitropio",
-    "R03BB04": "tiotropio",
-    "R03BB05": "aclidinio",
-    "R03BB06": "glicopirronio",
-    "R03BB07": "umeclidinio",
-    "R03BA01": "beclometasona",
-    "R03BA02": "budesonida",
-    "R03BA05": "fluticasona",
-    "R03BA07": "mometasona",
-    "R03BA08": "ciclesonida",
-    "R03AK03": "fenoterol + ipratropio",
-    "R03AL01": "fenoterol + ipratropio",
-    "R03AL02": "salbutamol + ipratropio",
-    "R03AK06": "salmeterol + fluticasona",
-    "R03AK07": "formoterol + budesonida",
-    "R03AK08": "formoterol + beclometasona",
-    "R03AK09": "formoterol + mometasona",
-    "R03AK10": "vilanterol + fluticasona furoat",
-    "R03AK11": "formoterol + fluticasona",
-    "R03AK14": "indacaterol + mometasona",
-    "R03AL03": "vilanterol + umeclidinio",
-    "R03AL04": "indacaterol + glicopirronio",
-    "R03AL05": "formoterol + aclidinio",
-    "R03AL06": "olodaterol + tiotropio",
-    "R03AL08": "vilanterol + umeclidinio + fluticasona furoat",
-    "R03AL09": "formoterol + glicopirronio + beclometasona",
-    "R03AL11": "formoterol + glicopirronio + budesonida",
-    "R03AL12": "indacaterol + glicopirronio + mometasona",
+    "R03AC02":"salbutamol", "R03AC03":"terbutalina", "R03AC04":"fenoterol",
+    "R03AC12":"salmeterol", "R03AC13":"formoterol",
+    "R03AC18":"indacaterol", "R03AC19":"olodaterol",
+    "R03BB01":"ipratropio", "R03BB02":"oxitropio",
+    "R03BB04":"tiotropio",  "R03BB05":"aclidinio",
+    "R03BB06":"glicopirronio", "R03BB07":"umeclidinio",
+    "R03BA01":"beclometasona", "R03BA02":"budesonida",
+    "R03BA05":"fluticasona",   "R03BA07":"mometasona", "R03BA08":"ciclesonida",
+    "R03AK03":"fenoterol + ipratropio",
+    "R03AL01":"fenoterol + ipratropio",
+    "R03AL02":"salbutamol + ipratropio",
+    "R03AK06":"salmeterol + fluticasona",
+    "R03AK07":"formoterol + budesonida",
+    "R03AK08":"formoterol + beclometasona",
+    "R03AK09":"formoterol + mometasona",
+    "R03AK10":"vilanterol + fluticasona furoat",
+    "R03AK11":"formoterol + fluticasona",
+    "R03AK14":"indacaterol + mometasona",
+    "R03AL03":"vilanterol + umeclidinio",
+    "R03AL04":"indacaterol + glicopirronio",
+    "R03AL05":"formoterol + aclidinio",
+    "R03AL06":"olodaterol + tiotropio",
+    "R03AL08":"vilanterol + umeclidinio + fluticasona furoat",
+    "R03AL09":"formoterol + glicopirronio + beclometasona",
+    "R03AL11":"formoterol + glicopirronio + budesonida",
+    "R03AL12":"indacaterol + glicopirronio + mometasona",
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# DOSIS PER CODI ATC — PHF CatSalut 2018
-# ═══════════════════════════════════════════════════════════════════════════════
 DOSIS_PER_ATC = {
     "R03AC02": ("100-200 µg si cal",    "200 µg/6h",             True,  False),
     "R03AC03": ("500 µg si cal",         "6.000 µg/24h",          False, False),
@@ -158,53 +205,6 @@ DOSIS_ASMA_COMBO = {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MAPA FORMA FARMACÈUTICA → DISPOSITIU
-# ═══════════════════════════════════════════════════════════════════════════════
-FORMA_FARMACEUTICA_MAP = {
-    "SUSPENSIÓN PARA INHALACIÓN EN ENVASE A PRESIÓN": (
-        "ICP", "🔴", "20-30 l/m", "Lenta",
-        "https://scientiasalut.gencat.cat/handle/11351/11880"),
-    "SOLUCIÓN PARA INHALACIÓN EN ENVASE A PRESIÓN": (
-        "ICP", "🔴", "20-30 l/m", "Lenta",
-        "https://scientiasalut.gencat.cat/handle/11351/11880"),
-    "SOLUCIÓN PARA INHALACIÓN": (
-        "IVS", "🟢", "20-30 l/m", "Lenta",
-        "https://scientiasalut.gencat.cat/handle/11351/11891"),
-    "POLVO PARA INHALACIÓN": (
-        "IPS-multi", "🟢", "Variable", "Ràpida",
-        "https://scientiasalut.gencat.cat/handle/11351/11881"),
-    "POLVO PARA INHALACIÓN (UNIDOSIS)": (
-        "IPS-uni", "🟢", "Variable", "Ràpida",
-        "https://scientiasalut.gencat.cat/handle/11351/11816"),
-    "SOLUCIÓN PARA INHALACIÓN POR NEBULIZACIÓN": (
-        "NEB", "🟢", "—", "—", ""),
-    "SUSPENSIÓN PARA INHALACIÓN POR NEBULIZACIÓN": (
-        "NEB", "🟢", "—", "—", ""),
-    "SOLUCIÓN PARA NEBULIZACIÓN": (
-        "NEB", "🟢", "—", "—", ""),
-    "SUSPENSIÓN PARA NEBULIZACIÓN": (
-        "NEB", "🟢", "—", "—", ""),
-}
-
-DISPOSITIU_LINK_MAP = {
-    "turbuhaler":  "https://scientiasalut.gencat.cat/handle/11351/11893",
-    "accuhaler":   "https://scientiasalut.gencat.cat/handle/11351/11813",
-    "genuair":     "https://scientiasalut.gencat.cat/handle/11351/11878",
-    "ellipta":     "https://scientiasalut.gencat.cat/handle/11351/11818",
-    "novolizer":   "https://scientiasalut.gencat.cat/handle/11351/11882",
-    "easyhaler":   "https://scientiasalut.gencat.cat/handle/11351/11817",
-    "nexthaler":   "https://scientiasalut.gencat.cat/handle/11351/11881",
-    "spiromax":    "https://scientiasalut.gencat.cat/handle/11351/11892",
-    "forspiro":    "https://scientiasalut.gencat.cat/handle/11351/11819",
-    "twisthaler":  "https://scientiasalut.gencat.cat/handle/11351/11894",
-    "breezhaler":  "https://scientiasalut.gencat.cat/handle/11351/11816",
-    "aerolizer":   "https://scientiasalut.gencat.cat/handle/11351/11815",
-    "handihaler":  "https://scientiasalut.gencat.cat/handle/11351/11879",
-    "zonda":       "https://scientiasalut.gencat.cat/handle/11351/11895",
-    "respimat":    "https://scientiasalut.gencat.cat/handle/11351/11891",
-}
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # FUNCIONS AUXILIARS
 # ═══════════════════════════════════════════════════════════════════════════════
 def v(val):
@@ -213,7 +213,6 @@ def v(val):
     return "" if s == "None" else s
 
 def normalitza_cn(cn):
-    """Elimina decimals dels CNs numèrics (ex: 656706.0 → 656706)"""
     cn = v(cn)
     try:
         return str(int(float(cn))) if cn.replace('.','').isdigit() else cn
@@ -233,39 +232,57 @@ def cima_get(endpoint, params=None, retries=3):
                 print(f"  ⚠️  Error CIMA: {e}")
                 return None
 
-def es_inhalatori(med):
-    """Comprova via inhalatòria usant viasAdministracion"""
-    vies = med.get("viasAdministracion", [])
-    return any("INHALAT" in v(via.get("nombre","")).upper() for via in vies)
+def get_codi_atc(med):
+    """Extreu el codi ATC més específic del medicament"""
+    atcs = med.get("atcs", [])
+    for atc in atcs:
+        codi = v(atc.get("codigo","")).upper()
+        if codi in ATC_A_CLASSE:
+            return codi
+    # Si no troba exacte, prova amb els 7 primers caràcters
+    for atc in atcs:
+        codi = v(atc.get("codigo","")).upper()[:7]
+        if codi in ATC_A_CLASSE:
+            return codi
+    # Retorna el primer ATC R03 que trobi
+    for atc in atcs:
+        codi = v(atc.get("codigo","")).upper()
+        if codi.startswith("R03"):
+            return codi
+    return ""
 
-def es_nebulitzador(med):
-    """Detecta nebulitzadors per la forma farmacèutica oficial"""
+def classifica_forma(med):
+    """
+    Classifica el medicament segons la forma farmacèutica.
+    Retorna: (tipus, co2, flux, flux4, link, es_nebulitzador)
+    """
     forma = med.get("formaFarmaceutica", {})
     forma_nom = v(forma.get("nombre", "")).upper()
-    return any(p in forma_nom for p in ["NEBULIZ", "POR NEBUL"])
+    nom_med = v(med.get("nombre","")).lower()
 
-def infereix_dispositiu(med):
-    """Infereix dispositiu usant formaFarmaceutica.nombre"""
-    forma = med.get("formaFarmaceutica", {})
-    forma_nom = v(forma.get("nombre", "")).upper()
-    nom = v(med.get("nombre", "")).lower()
+    # Comprova si és nebulitzador o no incorporable
+    for paraula in FORMES_NO_INCORPORAR:
+        if paraula in forma_nom:
+            return "NEB", "—", "—", "—", "", True
 
-    for clau, valors in FORMA_FARMACEUTICA_MAP.items():
-        if clau in forma_nom:
+    # Busca la forma al mapa de prescriptor
+    for forma_clau, valors in FORMES_PRESCRIPTOR.items():
+        if forma_clau in forma_nom:
             tipus, co2, flux, flux4, link = valors
+            # Refina link pel nom del dispositiu
             for disp_nom, disp_link in DISPOSITIU_LINK_MAP.items():
-                if disp_nom in nom:
+                if disp_nom in nom_med:
                     link = disp_link
                     if disp_nom == "respimat":
                         tipus = "IVS"
                     break
-            return tipus, co2, flux, flux4, link
+            return tipus, co2, flux, flux4, link, False
 
-    return ("ICP", "🔴", "20-30 l/m", "Lenta",
-            "https://scientiasalut.gencat.cat/handle/11351/11880")
+    # Forma desconeguda → ICP per defecte
+    return "ICP", "🔴", "20-30 l/m", "Lenta", \
+           "https://scientiasalut.gencat.cat/handle/11351/11880", False
 
 def construeix_dosi(codi_atc, nregistro):
-    """Construeix dosi a partir del codi ATC"""
     dosi_text = ""
     phf_val = matma_val = ""
     color_atencio = False
@@ -300,81 +317,93 @@ def construeix_dosi(codi_atc, nregistro):
     return dosi_text, phf_val, matma_val, color_atencio
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CONSULTA CIMA
+# CONSULTA CIMA — UNA SOLA CONSULTA
 # ═══════════════════════════════════════════════════════════════════════════════
 def get_tots_inhaladors_cima():
     """
-    Consulta CIMA per cada codi ATC R03.
-    - Filtre viasAdministracion (VÍA INHALATORIA)
-    - vtm.nombre per principi actiu + fallback per ATC
-    - formaFarmaceutica.nombre per dispositiu (detecta UNIDOSIS i NEB)
+    UNA SOLA consulta: vias=78 (inhalatoria) + atc=R03 + comerc=1
+    Retorna tots els 341 inhaladors MPOC/Asma comercialitzats a Espanya.
+    Filtre per formaFarmaceutica (exclou nebulitzadors).
+    Classe terapèutica des del codi ATC del medicament.
+    Principi actiu des de vtm.nombre + fallback per ATC.
     """
-    print("📡 Consultant CIMA — codis ATC R03...")
+    print("📡 Consultant CIMA — vias=78 + atc=R03 (consulta única)...")
     resultats = []
     cns_vistos = set()
+    pagina = 1
+    total_meds = 0
 
-    for codi_atc, classe in CODIS_ATC.items():
-        print(f"  🔍 {codi_atc} ({classe})...")
-        pagina = 1
-        trobats = 0
+    while True:
+        data = cima_get("medicamentos", {
+            "vias": 78,
+            "atc": "R03",
+            "comerc": 1,
+            "pagina": pagina
+        })
+        if not data: break
+        items = data.get("resultados", [])
+        if not items: break
+        total = data.get("totalFilas", 0)
+        total_meds += len(items)
+        print(f"  → Pàg {pagina}: {len(items)} medicaments ({total_meds}/{total})")
 
-        while True:
-            data = cima_get("medicamentos", {
-                "atc": codi_atc,
-                "comerc": 1,
-                "pagina": pagina
+        for med in items:
+            nregistro = v(med.get("nregistro", ""))
+            if not nregistro: continue
+
+            # Obté codi ATC específic del medicament
+            codi_atc = get_codi_atc(med)
+
+            # Principi actiu: vtm.nombre → pactivos → diccionari ATC
+            vtm = med.get("vtm", {})
+            principi = v(vtm.get("nombre", ""))
+            if not principi:
+                principi = v(med.get("pactivos", ""))
+            if not principi and codi_atc:
+                principi = PRINCIPI_PER_ATC.get(codi_atc, "")
+
+            # Classe terapèutica des del codi ATC
+            classe = ATC_A_CLASSE.get(codi_atc, "PENDENT")
+
+            # Obté presentacions comercialitzades
+            pres_data = cima_get("presentaciones", {
+                "nregistro": nregistro,
+                "comerc": 1
             })
-            if not data: break
-            items = data.get("resultados", [])
-            if not items: break
-            total = data.get("totalFilas", 0)
+            if not pres_data: continue
 
-            for med in items:
-                if not es_inhalatori(med):
+            for p in pres_data.get("resultados", []):
+                cn = normalitza_cn(p.get("cn", ""))
+                if not cn or cn in cns_vistos:
                     continue
+                cns_vistos.add(cn)
 
-                nregistro = v(med.get("nregistro", ""))
-                if not nregistro: continue
+                # Classifica la forma farmacèutica
+                # Usa el nom de la presentació per al dispositiu
+                med_proxy = dict(med)
+                med_proxy["nombre"] = v(p.get("nombre", ""))
+                tipus, co2, flux, flux4, link, es_neb = classifica_forma(med_proxy)
 
-                pres_data = cima_get("presentaciones", {
-                    "nregistro": nregistro,
-                    "comerc": 1
-                })
-                if not pres_data: continue
+                p["_classe"]    = classe
+                p["_atc"]       = codi_atc
+                p["_principi"]  = principi
+                p["_nregistro"] = nregistro
+                p["_tipus"]     = tipus
+                p["_co2"]       = co2
+                p["_flux"]      = flux
+                p["_flux4"]     = flux4
+                p["_link"]      = link
+                p["_es_neb"]    = es_neb
+                resultats.append(p)
 
-                for p in pres_data.get("resultados", []):
-                    cn = normalitza_cn(p.get("cn", ""))
-                    if not cn or cn in cns_vistos:
-                        continue
-                    cns_vistos.add(cn)
-
-                    # Principi actiu amb triple fallback
-                    vtm = med.get("vtm", {})
-                    principi = v(vtm.get("nombre", ""))
-                    if not principi:
-                        principi = v(med.get("pactivos", ""))
-                    if not principi:
-                        principi = PRINCIPI_PER_ATC.get(codi_atc, "")
-
-                    p["_classe"]            = classe
-                    p["_atc"]               = codi_atc
-                    p["_principi"]          = principi
-                    p["_nregistro"]         = nregistro
-                    p["_formaFarmaceutica"] = med.get("formaFarmaceutica", {})
-                    p["_viasAdministracio"] = med.get("viasAdministracion", [])
-                    p["_es_nebulitzador"]   = es_nebulitzador(med)
-                    resultats.append(p)
-                    trobats += 1
-
-            if pagina * 25 >= total: break
-            pagina += 1
-            time.sleep(0.3)
-
-        if trobats > 0:
-            print(f"    → {trobats} presentacions trobades")
+        if total_meds >= total: break
+        pagina += 1
         time.sleep(0.3)
 
-    print(f"  ✅ Total inhaladors: {len(resultats)}")
+    incorporables = sum(1 for r in resultats if not r.get("_es_neb"))
+    nebulitzadors = sum(1 for r in resultats if r.get("_es_neb"))
+    print(f"  ✅ Total: {len(resultats)} presentacions "
+          f"({incorporables} incorporables, {nebulitzadors} nebulitzadors)")
     return resultats
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -417,23 +446,22 @@ def mode_detecta():
         codi_atc  = p.get("_atc", "")
         classe    = p.get("_classe", "PENDENT")
         principi  = p.get("_principi", "")
-        es_neb    = p.get("_es_nebulitzador", False)
+        tipus     = p.get("_tipus", "ICP")
+        co2       = p.get("_co2", "🔴")
+        flux      = p.get("_flux", "20-30 l/m")
+        flux4     = p.get("_flux4", "Lenta")
+        link      = p.get("_link", "")
+        es_neb    = p.get("_es_neb", False)
 
-        print(f"  [{i}] {'[NEB] ' if es_neb else ''}{nom[:55]} ({codi_atc})")
+        tag = "[NEB] " if es_neb else ""
+        print(f"  [{i}] {tag}{nom[:55]} | {classe} | {tipus}")
 
-        med_proxy = {
-            "nombre": nom,
-            "formaFarmaceutica": p.get("_formaFarmaceutica", {}),
-            "viasAdministracion": p.get("_viasAdministracio", []),
-        }
-        tipus, co2, flux, flux4, link = infereix_dispositiu(med_proxy)
         dosi_text, phf_val, matma_val, color_atencio = construeix_dosi(
             codi_atc, nregistro)
 
         if es_neb:
             estat_validacio = "NO INCORPORAR — nebulitzador"
             color = fill_no_inc
-            tipus = "NEB"
         elif color_atencio:
             estat_validacio = "NOU — PENDENT VALIDACIÓ CLÍNICA"
             color = fill_atencio
