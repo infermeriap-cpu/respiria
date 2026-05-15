@@ -3,7 +3,11 @@
 RespirIA — Actualitzador automàtic CIMA → Excel → HTML
 =======================================================
 Autora: Sílvia Álvarez Vega · ICS Atenció Primària Girona
-Versió: 5.9 · 2026-05-15
+Versió: 5.9.1 · 2026-05-15
+
+Canvis v5.9.1:
+  - Separació de múltiples CNs a la mateixa cel·la (ex: "700582 ,710249")
+  - Evita falsos duplicats de fàrmacs com Formodual que tenen CNs múltiples
 
 Canvis v5.9:
   - Classe terapèutica i dosi inferides des de vtm.nombre (no ATC)
@@ -37,60 +41,57 @@ COLOR_NO_INC  = "F3F4F6"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAPA VTM.NOMBRE → (classe, dosi_mpoc, dosi_max, phf_star, matma)
-# Font: PHF CatSalut 2018 + GEMA 5.5
-# Clau: vtm.nombre normalitzat (minúscules, sense accents especials)
 # ═══════════════════════════════════════════════════════════════════════════════
 VTM_MAP = {
     # SABA
-    "salbutamol":           ("SABA", "100-200 µg si cal",  "200 µg/6h",              True,  False),
-    "terbutalina":          ("SABA", "500 µg si cal",       "6.000 µg/24h",           False, False),
-    "fenoterol":            ("SABA", "100-200 µg si cal",  "200 µg/6h",              False, False),
+    "salbutamol":           ("SABA", "100-200 µg si cal",  "200 µg/6h",               True,  False),
+    "terbutalina":          ("SABA", "500 µg si cal",       "6.000 µg/24h",            False, False),
+    "fenoterol":            ("SABA", "100-200 µg si cal",  "200 µg/6h",               False, False),
     # SAMA
-    "bromuro ipratropio":   ("SAMA", "40 µg si cal",        "240 µg/24h",             True,  False),
-    "ipratropio":           ("SAMA", "40 µg si cal",        "240 µg/24h",             True,  False),
-    "oxitropio":            ("SAMA", "200 µg si cal",       "800 µg/24h",             False, False),
+    "bromuro ipratropio":   ("SAMA", "40 µg si cal",        "240 µg/24h",              True,  False),
+    "ipratropio":           ("SAMA", "40 µg si cal",        "240 µg/24h",              True,  False),
+    "oxitropio":            ("SAMA", "200 µg si cal",       "800 µg/24h",              False, False),
     # LABA
-    "salmeterol":           ("LABA", "50 µg/12h",           "100 µg/12h",             True,  False),
-    "formoterol":           ("LABA", "12 µg/12h",           "24 µg/12h",              True,  False),
-    "indacaterol":          ("LABA", "150 µg/24h",          "300 µg/24h",             True,  False),
-    "olodaterol":           ("LABA", "5 µg/24h",            "5 µg/24h",               False, False),
+    "salmeterol":           ("LABA", "50 µg/12h",           "100 µg/12h",              True,  False),
+    "formoterol":           ("LABA", "12 µg/12h",           "24 µg/12h",               True,  False),
+    "indacaterol":          ("LABA", "150 µg/24h",          "300 µg/24h",              True,  False),
+    "olodaterol":           ("LABA", "5 µg/24h",            "5 µg/24h",                False, False),
     # LAMA
     "tiotropio":            ("LAMA", "18 µg/24h (Handihaler) / 5 µg/24h (Respimat) / 10 µg/24h (Zonda)", "= pauta", True, False),
-    "aclidinio":            ("LAMA", "322 µg/12h",          "322 µg/12h",             False, False),
-    "bromuro aclidinio":    ("LAMA", "322 µg/12h",          "322 µg/12h",             False, False),
-    "glicopirronio":        ("LAMA", "44 µg/24h",           "44 µg/24h",              False, False),
-    "bromuro umeclidinio":  ("LAMA", "55 µg/24h",           "55 µg/24h",              False, False),
-    "umeclidinio":          ("LAMA", "55 µg/24h",           "55 µg/24h",              False, False),
+    "aclidinio":            ("LAMA", "322 µg/12h",          "322 µg/12h",              False, False),
+    "bromuro aclidinio":    ("LAMA", "322 µg/12h",          "322 µg/12h",              False, False),
+    "glicopirronio":        ("LAMA", "44 µg/24h",           "44 µg/24h",               False, False),
+    "bromuro umeclidinio":  ("LAMA", "55 µg/24h",           "55 µg/24h",               False, False),
+    "umeclidinio":          ("LAMA", "55 µg/24h",           "55 µg/24h",               False, False),
     # GCI
-    "beclometasona":        ("GCI",  "250-500 µg/12h",      "1.000 µg/12h",           False, False),
-    "budesonida":           ("GCI",  "200-400 µg/12h",      "800 µg/12h",             False, False),
-    "fluticasona":          ("GCI",  "250-500 µg/12h",      "500 µg/12h",             False, False),
-    "mometasona":           ("GCI",  "200 µg/24h",          "800 µg/24h",             False, False),
-    "ciclesonida":          ("GCI",  "80-160 µg/24h",       "1.280 µg/24h",           False, False),
+    "beclometasona":        ("GCI",  "250-500 µg/12h",      "1.000 µg/12h",            False, False),
+    "budesonida":           ("GCI",  "200-400 µg/12h",      "800 µg/12h",              False, False),
+    "fluticasona":          ("GCI",  "250-500 µg/12h",      "500 µg/12h",              False, False),
+    "mometasona":           ("GCI",  "200 µg/24h",          "800 µg/24h",              False, False),
+    "ciclesonida":          ("GCI",  "80-160 µg/24h",       "1.280 µg/24h",            False, False),
     # SABA/SAMA
     "fenoterol + bromuro de ipratropio": ("SABA/SAMA", "100-200/40 µg si cal", "200/240 µg/24h", False, False),
     "salbutamol + bromuro ipratropio":   ("SABA/SAMA", "100-200/40 µg si cal", "200/240 µg/24h", False, False),
     # LABA/GCI
-    "salmeterol + fluticasona":          ("LABA/GCI", "50/500 µg/12h",        "50/500 µg/12h",  False, False),
-    "fluticasona + vilanterol":          ("LABA/GCI", "22/92 µg/24h",         "22/184 µg/24h",  False, False),
-    "fluticasona + formoterol":          ("LABA/GCI", "5/125 µg/12h",         "5/250 µg/12h",   False, False),
-    "budesonida + formoterol":           ("LABA/GCI", "9/320 µg/12h",         "36/1.280 µg/24h",False, False),
-    "beclometasona + formoterol":        ("LABA/GCI", "12/200 µg/12h",        "12/400 µg/12h",  False, False),
-    "indacaterol + mometasona":          ("LABA/GCI", "150/160 µg/24h",       "150/160 µg/24h", False, False),
-    "formoterol + mometasona":           ("LABA/GCI", "5/200 µg/24h",         "5/400 µg/24h",   False, False),
+    "salmeterol + fluticasona":          ("LABA/GCI", "50/500 µg/12h",         "50/500 µg/12h",  False, False),
+    "fluticasona + vilanterol":          ("LABA/GCI", "22/92 µg/24h",          "22/184 µg/24h",  False, False),
+    "fluticasona + formoterol":          ("LABA/GCI", "5/125 µg/12h",          "5/250 µg/12h",   False, False),
+    "budesonida + formoterol":           ("LABA/GCI", "9/320 µg/12h",          "36/1.280 µg/24h",False, False),
+    "beclometasona + formoterol":        ("LABA/GCI", "12/200 µg/12h",         "12/400 µg/12h",  False, False),
+    "indacaterol + mometasona":          ("LABA/GCI", "150/160 µg/24h",        "150/160 µg/24h", False, False),
+    "formoterol + mometasona":           ("LABA/GCI", "5/200 µg/24h",          "5/400 µg/24h",   False, False),
     # LABA/LAMA
-    "umeclidinio + vilanterol":          ("LABA/LAMA", "22/55 µg/24h",        "22/55 µg/24h",   False, False),
-    "indacaterol + glicopirronio":       ("LABA/LAMA", "150/50 µg/24h",       "150/50 µg/24h",  True,  False),
-    "aclidinio + formoterol":            ("LABA/LAMA", "12/340 µg/12h",       "12/340 µg/12h",  False, False),
-    "olodaterol + tiotropio":            ("LABA/LAMA", "5/5 µg/24h",          "5/5 µg/24h",     False, False),
+    "umeclidinio + vilanterol":          ("LABA/LAMA", "22/55 µg/24h",         "22/55 µg/24h",   False, False),
+    "indacaterol + glicopirronio":       ("LABA/LAMA", "150/50 µg/24h",        "150/50 µg/24h",  True,  False),
+    "aclidinio + formoterol":            ("LABA/LAMA", "12/340 µg/12h",        "12/340 µg/12h",  False, False),
+    "olodaterol + tiotropio":            ("LABA/LAMA", "5/5 µg/24h",           "5/5 µg/24h",     False, False),
     # LAMA/LABA/GCI
-    "beclometasona + formoterol + glicopirronio": ("LAMA/LABA/GCI", "10/18/87 µg/12h",    "10/18/174 µg/12h",   False, True),
-    "fluticasona + umeclidinio + vilanterol":      ("LAMA/LABA/GCI", "22/55/92 µg/24h",    "22/55/184 µg/24h",   False, True),
-    "formoterol + glicopirronio + budesonida":     ("LAMA/LABA/GCI", "5/7.2/160 µg/12h",   "5/7.2/160 µg/12h",   False, True),
-    "indacaterol + glicopirronio + mometasona":    ("LAMA/LABA/GCI", "150/50/160 µg/24h",  "150/50/160 µg/24h",  False, True),
+    "beclometasona + formoterol + glicopirronio": ("LAMA/LABA/GCI", "10/18/87 µg/12h",   "10/18/174 µg/12h",  False, True),
+    "fluticasona + umeclidinio + vilanterol":      ("LAMA/LABA/GCI", "22/55/92 µg/24h",   "22/55/184 µg/24h",  False, True),
+    "formoterol + glicopirronio + budesonida":     ("LAMA/LABA/GCI", "5/7.2/160 µg/12h",  "5/7.2/160 µg/12h",  False, True),
+    "indacaterol + glicopirronio + mometasona":    ("LAMA/LABA/GCI", "150/50/160 µg/24h", "150/50/160 µg/24h", False, True),
 }
 
-# Dosis asma GCI escalons GEMA 5.5 (vtm.nombre → baixa/mitjana/alta)
 DOSIS_ASMA_GCI_VTM = {
     "beclometasona": ("200-500 µg/24h",  "501-1.000 µg/24h", "1.001-2.000 µg/24h"),
     "budesonida":    ("200-400 µg/24h",  "401-800 µg/24h",   "801-1.600 µg/24h"),
@@ -99,7 +100,6 @@ DOSIS_ASMA_GCI_VTM = {
     "ciclesonida":   ("80-160 µg/24h",   "161-320 µg/24h",   "321-1.280 µg/24h"),
 }
 
-# Dosis asma combinacions escalons GEMA 5.5
 DOSIS_ASMA_COMBO_VTM = {
     "salmeterol + fluticasona":   ("50/100 µg/12h",    "50/250 µg/12h",    "50/500 µg/12h"),
     "budesonida + formoterol":    ("4.5/160 µg/12h",   "9/320 µg/12h",     "2 inh 9/320 µg/12h"),
@@ -109,9 +109,8 @@ DOSIS_ASMA_COMBO_VTM = {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# FORMES FARMACÈUTIQUES → DISPOSITIU
+# FORMES FARMACÈUTIQUES
 # ═══════════════════════════════════════════════════════════════════════════════
-# Formes que SÍ incorporem
 FORMES_OK = {
     "SUSPENSIÓN PARA INHALACIÓN EN ENVASE A PRESIÓN",
     "SOLUCIÓN PARA INHALACIÓN EN ENVASE A PRESIÓN",
@@ -123,7 +122,6 @@ FORMES_OK = {
     "LÍQUIDO PARA INHALACIÓN DEL VAPOR",
 }
 
-# Formes que NO incorporem (nebulitzadors i altres)
 FORMES_NO_INC = {
     "SOLUCIÓN PARA INHALACIÓN POR NEBULIZADOR",
     "SUSPENSIÓN PARA INHALACIÓN POR NEBULIZADOR",
@@ -132,7 +130,6 @@ FORMES_NO_INC = {
     "SOLUCIÓN ORAL O CONCENTRADO PARA INHALACIÓN POR NEBULIZADOR",
 }
 
-# Dispositius específics: nom_clau → (tipus, co2, flux, flux4, link)
 DISPOSITIU_MAP = {
     "turbuhaler":  ("IPS-multi","🟢","50-60 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11893"),
     "accuhaler":   ("IPS-multi","🟢","60-90 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11813"),
@@ -169,7 +166,6 @@ def normalitza_cn(cn):
         return cn
 
 def normalitza_vtm(vtm_nom):
-    """Normalitza el nom VTM per a la cerca al diccionari"""
     return v(vtm_nom).lower().strip()
 
 def cima_get(endpoint, params=None, retries=3):
@@ -186,17 +182,10 @@ def cima_get(endpoint, params=None, retries=3):
                 return None
 
 def classifica_forma(forma_nom):
-    """
-    Classifica la forma farmacèutica.
-    Retorna: (tipus_dispositiu, co2, flux, flux4, link, ok, es_neb)
-    """
     fn = forma_nom.upper().strip()
-
     if fn in FORMES_NO_INC:
         return "NEB","—","—","—","", False, True
-
     if fn in FORMES_OK:
-        # Tipus genèric per forma — es refinarà pel nom del dispositiu
         if "ENVASE A PRESIÓN" in fn or "ENVASE A PRESION" in fn:
             return "ICP","🔴","20-30 l/m","Lenta","https://scientiasalut.gencat.cat/handle/11351/11880", True, False
         elif "SOLUCIÓN PARA INHALACIÓN" in fn or "LÍQUIDO PARA INHALACIÓN" in fn:
@@ -205,15 +194,9 @@ def classifica_forma(forma_nom):
             return "IPS-uni","🟢","Variable","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11816", True, False
         else:
             return "IPS-multi","🟢","Variable","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11881", True, False
-
-    # Forma desconeguda → descartar
     return "?","—","—","—","", False, False
 
 def refina_dispositiu(nom_presentacio, tipus_base, flux_base, link_base):
-    """
-    Refina tipus, flux i link a partir del nom del dispositiu
-    que apareix al nom de la presentació.
-    """
     nl = nom_presentacio.lower()
     for disp, vals in DISPOSITIU_MAP.items():
         if disp in nl:
@@ -222,10 +205,6 @@ def refina_dispositiu(nom_presentacio, tipus_base, flux_base, link_base):
     return tipus_base, ("🔴" if tipus_base=="ICP" else "🟢"), flux_base, ("Lenta" if tipus_base in ["ICP","IVS"] else "Ràpida"), link_base
 
 def construeix_dosi_vtm(vtm_nom):
-    """
-    Construeix el text de dosi a partir del vtm.nombre.
-    Retorna: (dosi_text, phf_val, matma_val, color_atencio)
-    """
     vtm = normalitza_vtm(vtm_nom)
     dosi_text = ""
     phf_val = matma_val = ""
@@ -236,8 +215,6 @@ def construeix_dosi_vtm(vtm_nom):
         dosi_text = f"MPOC: {dosi_mpoc}\nD.màx: {dmx}"
         if starred: phf_val   = "★"
         if matma:   matma_val = "MATMA"
-
-        # Afegeix dosis asma si és GCI o LABA/GCI
         if vtm in DOSIS_ASMA_GCI_VTM:
             b, m, a = DOSIS_ASMA_GCI_VTM[vtm]
             dosi_text += f"\nAsma baixa: {b}\nAsma mitjana: {m}\nAsma alta: {a}"
@@ -251,7 +228,6 @@ def construeix_dosi_vtm(vtm_nom):
     return dosi_text, phf_val, matma_val, color_atencio
 
 def get_classe_vtm(vtm_nom):
-    """Retorna la classe terapèutica a partir del vtm.nombre"""
     vtm = normalitza_vtm(vtm_nom)
     if vtm in VTM_MAP:
         return VTM_MAP[vtm][0]
@@ -261,12 +237,6 @@ def get_classe_vtm(vtm_nom):
 # CONSULTA CIMA
 # ═══════════════════════════════════════════════════════════════════════════════
 def get_tots_inhaladors_cima():
-    """
-    Consulta única: vias=78 + atc=R03 + comerc=1 → 341 medicaments.
-    Filtre per formaFarmaceutica (exclou nebulitzadors i orals).
-    Classe i dosi inferides des de vtm.nombre.
-    Flux inspiratori específic per dispositiu.
-    """
     print("📡 Consultant CIMA — vias=78 + atc=R03...")
     resultats = []
     cns_vistos = set()
@@ -288,20 +258,17 @@ def get_tots_inhaladors_cima():
             nregistro = v(med.get("nregistro",""))
             if not nregistro: continue
 
-            forma_obj  = med.get("formaFarmaceutica", {})
-            forma_nom  = v(forma_obj.get("nombre",""))
-            vtm_obj    = med.get("vtm", {})
-            vtm_nom    = v(vtm_obj.get("nombre",""))
+            forma_obj = med.get("formaFarmaceutica", {})
+            forma_nom = v(forma_obj.get("nombre",""))
+            vtm_obj   = med.get("vtm", {})
+            vtm_nom   = v(vtm_obj.get("nombre",""))
 
-            # Classifica la forma farmacèutica
             tipus_base, co2_base, flux_base, flux4_base, link_base, ok, es_neb = \
                 classifica_forma(forma_nom)
 
-            # Si la forma no és reconeguda i no és nebulitzador → salta
             if not ok and not es_neb:
                 continue
 
-            # Obté presentacions
             pres_data = cima_get("presentaciones", {
                 "nregistro": nregistro, "comerc": 1
             })
@@ -314,7 +281,6 @@ def get_tots_inhaladors_cima():
                     continue
                 cns_vistos.add(cn)
 
-                # Refina dispositiu pel nom de la presentació
                 if ok and not es_neb:
                     tipus, co2, flux, flux4, link = refina_dispositiu(
                         nom, tipus_base, flux_base, link_base)
@@ -349,10 +315,15 @@ def mode_detecta():
     wb = openpyxl.load_workbook(EXCEL_PATH)
     ws = wb.active
 
+    # Lectura CNs existents — separa múltiples CNs a la mateixa cel·la
+    # (ex: "700582 ,710249" → {700582, 710249})
     cns = set()
     for row in ws.iter_rows(min_row=2, values_only=True):
-        cn = normalitza_cn(row[I_CN])
-        if cn: cns.add(cn)
+        cel = v(row[I_CN])
+        if not cel: continue
+        for cn in cel.replace(';', ',').split(','):
+            cn_net = normalitza_cn(cn.strip())
+            if cn_net: cns.add(cn_net)
     print(f"  CNs existents: {len(cns)}")
 
     presentacions = get_tots_inhaladors_cima()
