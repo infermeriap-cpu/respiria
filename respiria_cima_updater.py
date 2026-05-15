@@ -7,19 +7,17 @@ Versió: 5.9.1 · 2026-05-15
 
 Canvis v5.9.1:
   - Separació de múltiples CNs a la mateixa cel·la (ex: "700582 ,710249")
-  - Evita falsos duplicats de fàrmacs com Formodual que tenen CNs múltiples
+  - Evita falsos duplicats de fàrmacs com Formodual
 
 Canvis v5.9:
-  - Classe terapèutica i dosi inferides des de vtm.nombre (no ATC)
-  - Flux inspiratori específic per dispositiu (no genèric "Variable")
-  - Mapa VTM → classe + dosi cobreix totes les combinacions
-  - Filtre per formaFarmaceutica exclou orals, injectables i nebulitzadors
-  - Consulta única: vias=78 + atc=R03 + comerc=1 → 341 medicaments
+  - Classe i dosi inferides des de vtm.nombre (sempre correcte)
+  - Flux inspiratori específic per dispositiu (Turbuhaler 50-60, Accuhaler 60-90...)
+  - Nebulitzadors descartats automàticament
+  - Consulta única vias=78 + atc=R03 + comerc=1
 """
 
 import requests, openpyxl, time, shutil, sys
 from datetime import datetime
-from bs4 import BeautifulSoup
 from openpyxl.styles import PatternFill, Font, Alignment
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -130,6 +128,7 @@ FORMES_NO_INC = {
     "SOLUCIÓN ORAL O CONCENTRADO PARA INHALACIÓN POR NEBULIZADOR",
 }
 
+# Dispositius específics amb flux inspiratori correcte per a cada un
 DISPOSITIU_MAP = {
     "turbuhaler":  ("IPS-multi","🟢","50-60 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11893"),
     "accuhaler":   ("IPS-multi","🟢","60-90 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11813"),
@@ -182,6 +181,7 @@ def cima_get(endpoint, params=None, retries=3):
                 return None
 
 def classifica_forma(forma_nom):
+    """Classifica la forma farmacèutica i retorna el tipus base de dispositiu"""
     fn = forma_nom.upper().strip()
     if fn in FORMES_NO_INC:
         return "NEB","—","—","—","", False, True
@@ -191,20 +191,24 @@ def classifica_forma(forma_nom):
         elif "SOLUCIÓN PARA INHALACIÓN" in fn or "LÍQUIDO PARA INHALACIÓN" in fn:
             return "IVS","🟢","20-30 l/m","Lenta","https://scientiasalut.gencat.cat/handle/11351/11891", True, False
         elif "CÁPSULA DURA" in fn or "CAPSULA DURA" in fn or "UNIDOSIS" in fn:
-            return "IPS-uni","🟢","Variable","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11816", True, False
+            return "IPS-uni","🟢","<50 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11816", True, False
         else:
-            return "IPS-multi","🟢","Variable","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11881", True, False
+            return "IPS-multi","🟢","60-90 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11881", True, False
     return "?","—","—","—","", False, False
 
-def refina_dispositiu(nom_presentacio, tipus_base, flux_base, link_base):
+def refina_dispositiu(nom_presentacio, tipus_base, co2_base, flux_base, flux4_base, link_base):
+    """
+    Refina el tipus, flux i link a partir del nom específic del dispositiu.
+    Prioritat: nom dispositiu al nom de la presentació > tipus genèric de la forma.
+    """
     nl = nom_presentacio.lower()
     for disp, vals in DISPOSITIU_MAP.items():
         if disp in nl:
-            tipus, co2, flux, flux4, link = vals
-            return tipus, co2, flux, flux4, link
-    return tipus_base, ("🔴" if tipus_base=="ICP" else "🟢"), flux_base, ("Lenta" if tipus_base in ["ICP","IVS"] else "Ràpida"), link_base
+            return vals  # (tipus, co2, flux, flux4, link)
+    return tipus_base, co2_base, flux_base, flux4_base, link_base
 
 def construeix_dosi_vtm(vtm_nom):
+    """Construeix el text de dosi a partir del vtm.nombre"""
     vtm = normalitza_vtm(vtm_nom)
     dosi_text = ""
     phf_val = matma_val = ""
@@ -237,6 +241,10 @@ def get_classe_vtm(vtm_nom):
 # CONSULTA CIMA
 # ═══════════════════════════════════════════════════════════════════════════════
 def get_tots_inhaladors_cima():
+    """
+    Consulta única: vias=78 + atc=R03 + comerc=1 → 341 medicaments.
+    Classe i dosi des de vtm.nombre. Flux des del nom del dispositiu.
+    """
     print("📡 Consultant CIMA — vias=78 + atc=R03...")
     resultats = []
     cns_vistos = set()
@@ -258,10 +266,8 @@ def get_tots_inhaladors_cima():
             nregistro = v(med.get("nregistro",""))
             if not nregistro: continue
 
-            forma_obj = med.get("formaFarmaceutica", {})
-            forma_nom = v(forma_obj.get("nombre",""))
-            vtm_obj   = med.get("vtm", {})
-            vtm_nom   = v(vtm_obj.get("nombre",""))
+            forma_nom = v(med.get("formaFarmaceutica", {}).get("nombre",""))
+            vtm_nom   = v(med.get("vtm", {}).get("nombre",""))
 
             tipus_base, co2_base, flux_base, flux4_base, link_base, ok, es_neb = \
                 classifica_forma(forma_nom)
@@ -283,7 +289,7 @@ def get_tots_inhaladors_cima():
 
                 if ok and not es_neb:
                     tipus, co2, flux, flux4, link = refina_dispositiu(
-                        nom, tipus_base, flux_base, link_base)
+                        nom, tipus_base, co2_base, flux_base, flux4_base, link_base)
                 else:
                     tipus, co2, flux, flux4, link = "NEB","—","—","—",""
 
@@ -315,8 +321,7 @@ def mode_detecta():
     wb = openpyxl.load_workbook(EXCEL_PATH)
     ws = wb.active
 
-    # Lectura CNs existents — separa múltiples CNs a la mateixa cel·la
-    # (ex: "700582 ,710249" → {700582, 710249})
+    # Lectura CNs — separa múltiples CNs a la mateixa cel·la (ex: "700582 ,710249")
     cns = set()
     for row in ws.iter_rows(min_row=2, values_only=True):
         cel = v(row[I_CN])
