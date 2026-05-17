@@ -41,7 +41,7 @@ jobs:
         id: check
         run: |
           set -x
-          python respiria_cima_updater.py --detecta 2>&1
+          python respiria_cima_updater.py --mode=detecta 2>&1
           echo "Exit code: $?"
           if [ -f novetats_count.txt ]; then
             COUNT=$(cat novetats_count.txt)
@@ -122,7 +122,7 @@ jobs:
       - name: Comprovar pendents antics
         id: pendents
         run: |
-          python respiria_cima_updater.py --comprova-pendents
+          python respiria_cima_updater.py --mode=comprova-pendents
           if [ -f pendents_count.txt ]; then
             COUNT=$(cat pendents_count.txt)
             echo "num_pendents=$COUNT" >> $GITHUB_OUTPUT
@@ -182,7 +182,7 @@ jobs:
       - name: Comprovar si hi ha novetats validades per publicar
         id: publicar
         run: |
-          python respiria_cima_updater.py --comprova-publicar
+          python respiria_cima_updater.py --mode=comprova-publicar
           if [ -f publicar_count.txt ]; then
             COUNT=$(cat publicar_count.txt)
             echo "num_publicar=$COUNT" >> $GITHUB_OUTPUT
@@ -198,7 +198,7 @@ jobs:
 
       - name: Regenerar HTML amb farmacs validats
         if: steps.publicar.outputs.cal_publicar == 'true'
-        run: python respiria_cima_updater.py --regenera
+        run: python respiria_cima_updater.py --mode=regenera
 
       - name: Guardar HTML actualitzat
         if: steps.publicar.outputs.cal_publicar == 'true'
