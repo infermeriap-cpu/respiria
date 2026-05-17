@@ -342,7 +342,36 @@ def mode_comprova_pendents():
     print(f"✅ {count} fàrmacs pendents de validació → pendents_count.txt")
 
 # ── MODE: --detecta ───────────────────────────────────────────────────────────
+# Formes farmacèutiques que NO són inhaladors → descartar
+FORMES_EXCLOURE = [
+    "comprimido", "comprimits", "tableta", "capsula dura oral",
+    "solucion oral", "solució oral", "jarabe", "xarop",
+    "inyectable", "injectable", "infusion", "perfusion",
+    "nasal", "oftalmico", "topico", "cutaneo", "crema",
+    "nebulizador", "nebulitzador", "inhalacion por nebulizador",
+    "polvo para reconstitucion", "granulado",
+]
+
+def es_inhalador_valid(forma: str) -> bool:
+    """Retorna True si la forma farmacèutica és un inhalador vàlid (no oral, no injectable, no nebulitzador)."""
+    if not forma:
+        return False
+    f = forma.lower()
+    for excl in FORMES_EXCLOURE:
+        if excl in f:
+            return False
+    # Ha de contenir alguna paraula d'inhalador
+    paraules_inhalador = [
+        "inhal", "aerosol", "polvo para inh", "pols per a inh",
+        "vapor", "respimat", "turbuhaler", "accuhaler", "ellipta",
+        "breezhaler", "genuair", "novolizer", "easyhaler",
+        "nexthaler", "spiromax", "handihaler", "aerolizer",
+        "pressuritzat", "pressurizado",
+    ]
+    return any(p in f for p in paraules_inhalador)
+
 def inferir_cat_des_atc(atc: str, ia: str) -> str:
+    """Retorna la classe terapèutica o None si el codi ATC no és reconegut."""
     ia_l = ia.lower()
     if "R03AC" in atc:
         return "SABA" if any(x in ia_l for x in ["salbutamol", "terbutalin"]) else "LABA"
@@ -353,13 +382,18 @@ def inferir_cat_des_atc(atc: str, ia: str) -> str:
         if te_gci:             return "LABA/GCI"
         return "LABA/LAMA"
     if "R03AK" in atc:
-        if any(x in ia_l for x in ["glicopirroni", "umeclidini"]): return "LAMA/LABA/GCI"
+        te_lama = any(x in ia_l for x in ["glicopirroni", "umeclidini", "aclidini", "tiotropi"])
+        te_gci = any(x in ia_l for x in ["beclometasona", "fluticasona", "budesonida", "mometasona"])
+        if te_lama and te_gci: return "LAMA/LABA/GCI"
+        if te_lama:            return "LABA/LAMA"
         return "LABA/GCI"
     if "R03BB" in atc:
-        return "SAMA" if "ipratropi" in ia_l else "LAMA"
+        return "SAMA" if any(x in ia_l for x in ["ipratropi", "ipratropium"]) else "LAMA"
     if "R03BA" in atc: return "GCI"
     if "R03AB" in atc: return "SAMA"
-    return "SABA"
+    if "R03CC" in atc: return "SABA"
+    # Codi ATC no reconegut → descartar (no afegir al Excel)
+    return None
 
 def mode_detecta():
     print("\n=== MODE DETECTA ===")
@@ -419,6 +453,7 @@ def mode_detecta():
     # Afegir novetats a l'Excel
     today = date.today().isoformat()
     afegits = 0
+    descartats = 0
     for med in novetats:
         cn   = str(med.get("cn", "")).strip().zfill(6)
         nom  = med.get("nombre", "").strip()
@@ -427,11 +462,20 @@ def mode_detecta():
         nreg = med.get("nregistro", "")
         cima_url = f"https://cima.aemps.es/cima/publico/detalle.html?nregistro={nreg}"
         disp = med.get("formaFarmaFull", "") or med.get("formaFarma", "")
-        tipus = inferir_tipus(disp)
-        if "nebulitz" in disp.lower():
+
+        # Filtre 1: forma farmacèutica ha de ser inhalador vàlid
+        if not es_inhalador_valid(disp):
+            descartats += 1
             continue
+
+        tipus = inferir_tipus(disp)
         atc_grup = med.get("atc", [{}])[0].get("codigo", "") if med.get("atc") else ""
         cat = inferir_cat_des_atc(atc_grup, ia)
+
+        # Filtre 2: categoria ha de ser reconeguda (no None)
+        if cat is None:
+            descartats += 1
+            continue
 
         ws.append([
             cat, ia, nom, cn, disp,
@@ -451,7 +495,7 @@ def mode_detecta():
     wb.save(EXCEL_FNAME)
     with open("novetats_count.txt", "w") as f:
         f.write(str(afegits))
-    print(f"✅ DETECTA: {afegits} novetats afegides com 'NOU — PENDENT'.")
+    print(f"✅ DETECTA: {afegits} novetats afegides com 'NOU — PENDENT' ({descartats} descartades per forma/ATC incorrecte).")
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
