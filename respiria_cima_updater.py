@@ -1,460 +1,473 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-RespirIA — Actualitzador automàtic CIMA → Excel → HTML
-=======================================================
-Autora: Sílvia Álvarez Vega · ICS Atenció Primària Girona
-Versió: 5.9.1 · 2026-05-15
+respiria_cima_updater.py  —  v6.1
+===================================
+Autor: Sílvia Álvarez Vega  |  ICS Atenció Primària Girona
+Projecte: RespirIA — Prescriptor digital d'inhaladors
 
-Canvis v5.9.1:
-  - Separació de múltiples CNs a la mateixa cel·la (ex: "700582 ,710249")
-  - Evita falsos duplicats de fàrmacs com Formodual
+MODES
+-----
+  --detecta            Consulta CIMA, detecta CNs nous, els afegeix a
+                       l'Excel com "NOU — PENDENT" i envia correu.
 
-Canvis v5.9:
-  - Classe i dosi inferides des de vtm.nombre (sempre correcte)
-  - Flux inspiratori específic per dispositiu (Turbuhaler 50-60, Accuhaler 60-90...)
-  - Nebulitzadors descartats automàticament
-  - Consulta única vias=78 + atc=R03 + comerc=1
+  --comprova-pendents  Compta files amb "NOU — PENDENT" → pendents_count.txt
+
+  --comprova-publicar  Compta novetats validades (col N buida + col M=CIMA
+                       + col L té data) → publicar_count.txt
+
+  --regenera           FUSIÓ: llegeix el catalog del HTML actual (fàrmacs
+                       ja publicats) + afegeix les novetats validades de
+                       l'Excel → desa el nou RespirIA_v2.html.
+
+  --tot                Executa --detecta + --regenera (ús local)
+
+LÒGICA DE FUSIÓ (--regenera)
+------------------------------
+  El --regenera NO toca els fàrmacs ja publicats al HTML.
+  Només afegeix les novetats que compleixen les 3 condicions:
+    1. Col N = buida  (la Sílvia ha validat, ha esborrat "NOU — PENDENT")
+    2. Col M conté URL de cima.aemps.es  (prové del --detecta, no és manual)
+    3. Col L té data  (posada automàticament pel --detecta)
+
+  Així els fàrmacs originals de l'Excel (sense URL CIMA ni data)
+  es conserven intactes al HTML i no es re-processen.
+
+ESTRUCTURA EXCEL MESTRE (columnes A..P)
+---------------------------------------
+  A  Classe terapèutica
+  B  Principi actiu
+  C  Nom comercial
+  D  Codi nacional CN
+  E  Dispositiu/Presentació
+  F  Dosi recomanada
+  G  Tipus dispositiu  (ICP / IVS / IPS-multi / IPS-uni / NEB)
+  H  Petjada CO₂
+  I  Flux inspiratori
+  J  Maniobra
+  K  Link instruccions
+  L  Data incorporació  ← posada pel --detecta (novetats)
+  M  Origen CIMA        ← URL cima.aemps.es (posada pel --detecta)
+  N  Estat validació    ← "NOU — PENDENT" / "NO INCORPORAR" / buida=validat
+  O  PHF ★
+  P  MATMA
 """
 
-import requests, openpyxl, time, shutil, sys
-from datetime import datetime
-from openpyxl.styles import PatternFill, Font, Alignment
+import argparse
+import json
+import os
+import re
+import sys
+import time
+from datetime import date
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CONFIGURACIÓ
-# ═══════════════════════════════════════════════════════════════════════════════
-EXCEL_PATH  = "inhaladors_MPOC_ASMA_Avanzado_FINAL.xlsx"
-HTML_PATH   = "RespirIA_v2.html"
-CIMA_BASE   = "https://cima.aemps.es/cima/rest"
+import openpyxl
+import requests
 
-I_CLASSE = 0;  I_IA = 1;  I_NOM = 2;   I_CN = 3
-I_DISP   = 4;  I_DOSI = 5; I_TIPUS = 6; I_CO2 = 7
-I_FLUX   = 8;  I_FLUX4 = 9; I_LINK = 10
-I_DATA   = 11; I_ORIGEN = 12; I_ESTAT = 13
-I_PHF    = 14; I_MATMA = 15
+# ── Configuració ──────────────────────────────────────────────────────────────
+GITHUB_OWNER = "infermeriap-cpu"
+GITHUB_REPO  = "respiria"
+EXCEL_FNAME  = "inhaladors_MPOC_ASMA_Avanzado_FINAL.xlsx"
+HTML_FNAME   = "RespirIA_v2.html"
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
-COLOR_NOU     = "FEF3C7"
-COLOR_ATENCIO = "FEE2E2"
-COLOR_NO_INC  = "F3F4F6"
+CIMA_URL    = "https://cima.aemps.es/cima/rest/medicamentos"
+CIMA_PARAMS = {"vias": "78", "atc": "R03", "comerc": "1", "pagina": 1, "tamPagina": 100}
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# MAPA VTM.NOMBRE → (classe, dosi_mpoc, dosi_max, phf_star, matma)
-# ═══════════════════════════════════════════════════════════════════════════════
-VTM_MAP = {
-    # SABA
-    "salbutamol":           ("SABA", "100-200 µg si cal",  "200 µg/6h",               True,  False),
-    "terbutalina":          ("SABA", "500 µg si cal",       "6.000 µg/24h",            False, False),
-    "fenoterol":            ("SABA", "100-200 µg si cal",  "200 µg/6h",               False, False),
-    # SAMA
-    "bromuro ipratropio":   ("SAMA", "40 µg si cal",        "240 µg/24h",              True,  False),
-    "ipratropio":           ("SAMA", "40 µg si cal",        "240 µg/24h",              True,  False),
-    "oxitropio":            ("SAMA", "200 µg si cal",       "800 µg/24h",              False, False),
-    # LABA
-    "salmeterol":           ("LABA", "50 µg/12h",           "100 µg/12h",              True,  False),
-    "formoterol":           ("LABA", "12 µg/12h",           "24 µg/12h",               True,  False),
-    "indacaterol":          ("LABA", "150 µg/24h",          "300 µg/24h",              True,  False),
-    "olodaterol":           ("LABA", "5 µg/24h",            "5 µg/24h",                False, False),
-    # LAMA
-    "tiotropio":            ("LAMA", "18 µg/24h (Handihaler) / 5 µg/24h (Respimat) / 10 µg/24h (Zonda)", "= pauta", True, False),
-    "aclidinio":            ("LAMA", "322 µg/12h",          "322 µg/12h",              False, False),
-    "bromuro aclidinio":    ("LAMA", "322 µg/12h",          "322 µg/12h",              False, False),
-    "glicopirronio":        ("LAMA", "44 µg/24h",           "44 µg/24h",               False, False),
-    "bromuro umeclidinio":  ("LAMA", "55 µg/24h",           "55 µg/24h",               False, False),
-    "umeclidinio":          ("LAMA", "55 µg/24h",           "55 µg/24h",               False, False),
-    # GCI
-    "beclometasona":        ("GCI",  "250-500 µg/12h",      "1.000 µg/12h",            False, False),
-    "budesonida":           ("GCI",  "200-400 µg/12h",      "800 µg/12h",              False, False),
-    "fluticasona":          ("GCI",  "250-500 µg/12h",      "500 µg/12h",              False, False),
-    "mometasona":           ("GCI",  "200 µg/24h",          "800 µg/24h",              False, False),
-    "ciclesonida":          ("GCI",  "80-160 µg/24h",       "1.280 µg/24h",            False, False),
-    # SABA/SAMA
-    "fenoterol + bromuro de ipratropio": ("SABA/SAMA", "100-200/40 µg si cal", "200/240 µg/24h", False, False),
-    "salbutamol + bromuro ipratropio":   ("SABA/SAMA", "100-200/40 µg si cal", "200/240 µg/24h", False, False),
-    # LABA/GCI
-    "salmeterol + fluticasona":          ("LABA/GCI", "50/500 µg/12h",         "50/500 µg/12h",  False, False),
-    "fluticasona + vilanterol":          ("LABA/GCI", "22/92 µg/24h",          "22/184 µg/24h",  False, False),
-    "fluticasona + formoterol":          ("LABA/GCI", "5/125 µg/12h",          "5/250 µg/12h",   False, False),
-    "budesonida + formoterol":           ("LABA/GCI", "9/320 µg/12h",          "36/1.280 µg/24h",False, False),
-    "beclometasona + formoterol":        ("LABA/GCI", "12/200 µg/12h",         "12/400 µg/12h",  False, False),
-    "indacaterol + mometasona":          ("LABA/GCI", "150/160 µg/24h",        "150/160 µg/24h", False, False),
-    "formoterol + mometasona":           ("LABA/GCI", "5/200 µg/24h",          "5/400 µg/24h",   False, False),
-    # LABA/LAMA
-    "umeclidinio + vilanterol":          ("LABA/LAMA", "22/55 µg/24h",         "22/55 µg/24h",   False, False),
-    "indacaterol + glicopirronio":       ("LABA/LAMA", "150/50 µg/24h",        "150/50 µg/24h",  True,  False),
-    "aclidinio + formoterol":            ("LABA/LAMA", "12/340 µg/12h",        "12/340 µg/12h",  False, False),
-    "olodaterol + tiotropio":            ("LABA/LAMA", "5/5 µg/24h",           "5/5 µg/24h",     False, False),
-    # LAMA/LABA/GCI
-    "beclometasona + formoterol + glicopirronio": ("LAMA/LABA/GCI", "10/18/87 µg/12h",   "10/18/174 µg/12h",  False, True),
-    "fluticasona + umeclidinio + vilanterol":      ("LAMA/LABA/GCI", "22/55/92 µg/24h",   "22/55/184 µg/24h",  False, True),
-    "formoterol + glicopirronio + budesonida":     ("LAMA/LABA/GCI", "5/7.2/160 µg/12h",  "5/7.2/160 µg/12h",  False, True),
-    "indacaterol + glicopirronio + mometasona":    ("LAMA/LABA/GCI", "150/50/160 µg/24h", "150/50/160 µg/24h", False, True),
-}
+# ── Mapeig Tipus dispositiu ───────────────────────────────────────────────────
+TIPUS_MAP = [
+    (["pMDI", "Modulite", "Aerosphere", "MDI", "aerosol pressuritzat",
+      "inhalador pressuritzat"], "ICP"),
+    (["Respimat", "SMI", "vapor suau"], "IVS"),
+    (["Turbuhaler", "Accuhaler", "Genuair", "Ellipta", "Novolizer", "Easyhaler",
+      "Nexthaler", "Spiromax", "Forspiro", "Twisthaler",
+      "IPS multidosi", "pols seca multidosi"], "IPS-multi"),
+    (["Aerolizer", "Breezhaler", "Handihaler", "Zonda",
+      "IPS unidosi", "pols seca unidosi", "càpsula"], "IPS-uni"),
+]
 
-DOSIS_ASMA_GCI_VTM = {
-    "beclometasona": ("200-500 µg/24h",  "501-1.000 µg/24h", "1.001-2.000 µg/24h"),
-    "budesonida":    ("200-400 µg/24h",  "401-800 µg/24h",   "801-1.600 µg/24h"),
-    "fluticasona":   ("100-250 µg/24h",  "251-500 µg/24h",   "501-1.000 µg/24h"),
-    "mometasona":    ("200 µg/24h",      "400 µg/24h",       "800 µg/24h"),
-    "ciclesonida":   ("80-160 µg/24h",   "161-320 µg/24h",   "321-1.280 µg/24h"),
-}
+def inferir_tipus(disp_text: str) -> str:
+    if not disp_text:
+        return "ICP"
+    d = str(disp_text)
+    for keywords, tipus in TIPUS_MAP:
+        for kw in keywords:
+            if kw.lower() in d.lower():
+                return tipus
+    return "ICP"
 
-DOSIS_ASMA_COMBO_VTM = {
-    "salmeterol + fluticasona":   ("50/100 µg/12h",    "50/250 µg/12h",    "50/500 µg/12h"),
-    "budesonida + formoterol":    ("4.5/160 µg/12h",   "9/320 µg/12h",     "2 inh 9/320 µg/12h"),
-    "beclometasona + formoterol": ("6/100: 1 inh/12h", "6/100: 2 inh/12h", "6/200: 2 inh/12h"),
-    "fluticasona + vilanterol":   ("22/92 µg/24h",     "22/92 µg/24h",     "22/184 µg/24h"),
-    "fluticasona + formoterol":   ("5/100 µg/12h",     "5/250 µg/12h",     "5/500 µg/12h"),
-}
+# ── Mapeig Dosi ───────────────────────────────────────────────────────────────
+def parsear_dosi(dosi_text: str, cat: str) -> dict:
+    if not dosi_text or str(dosi_text).strip() in ("", "nan"):
+        return {}
+    text = str(dosi_text).strip()
+    result = {}
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# FORMES FARMACÈUTIQUES
-# ═══════════════════════════════════════════════════════════════════════════════
-FORMES_OK = {
-    "SUSPENSIÓN PARA INHALACIÓN EN ENVASE A PRESIÓN",
-    "SOLUCIÓN PARA INHALACIÓN EN ENVASE A PRESIÓN",
-    "POLVO PARA INHALACIÓN",
-    "POLVO PARA INHALACIÓN (UNIDOSIS)",
-    "POLVO PARA INHALACIÓN (CÁPSULA DURA)",
-    "SOLUCIÓN PARA INHALACIÓN",
-    "SOLUCIÓN PARA INHALACIÓN DEL VAPOR",
-    "LÍQUIDO PARA INHALACIÓN DEL VAPOR",
-}
+    dmx_match = re.search(r"[Dd]\.?\s*[Mm]à?x[\.:]?\s*(.+?)(?:\n|$)", text)
+    if dmx_match:
+        result["dmx"] = dmx_match.group(1).strip()
 
-FORMES_NO_INC = {
-    "SOLUCIÓN PARA INHALACIÓN POR NEBULIZADOR",
-    "SUSPENSIÓN PARA INHALACIÓN POR NEBULIZADOR",
-    "POLVO PARA SOLUCIÓN PARA INHALACIÓN POR NEBULIZADOR",
-    "POLVO Y DISOLVENTE PARA SOLUCIÓN PARA INHALACIÓN POR NEBULIZADOR",
-    "SOLUCIÓN ORAL O CONCENTRADO PARA INHALACIÓN POR NEBULIZADOR",
-}
-
-# Dispositius específics amb flux inspiratori correcte per a cada un
-DISPOSITIU_MAP = {
-    "turbuhaler":  ("IPS-multi","🟢","50-60 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11893"),
-    "accuhaler":   ("IPS-multi","🟢","60-90 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11813"),
-    "genuair":     ("IPS-multi","🟢","60-90 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11878"),
-    "ellipta":     ("IPS-multi","🟢","<50 l/m",  "Ràpida","https://scientiasalut.gencat.cat/handle/11351/11818"),
-    "novolizer":   ("IPS-multi","🟢","60-90 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11882"),
-    "easyhaler":   ("IPS-multi","🟢","<50 l/m",  "Ràpida","https://scientiasalut.gencat.cat/handle/11351/11817"),
-    "nexthaler":   ("IPS-multi","🟢","60-90 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11881"),
-    "spiromax":    ("IPS-multi","🟢","60-90 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11892"),
-    "forspiro":    ("IPS-multi","🟢","60-90 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11819"),
-    "twisthaler":  ("IPS-multi","🟢","<50 l/m",  "Ràpida","https://scientiasalut.gencat.cat/handle/11351/11894"),
-    "breezhaler":  ("IPS-uni", "🟢",">90 l/m",  "Ràpida","https://scientiasalut.gencat.cat/handle/11351/11816"),
-    "aerolizer":   ("IPS-uni", "🟢",">90 l/m",  "Ràpida","https://scientiasalut.gencat.cat/handle/11351/11815"),
-    "handihaler":  ("IPS-uni", "🟢","<50 l/m",  "Ràpida","https://scientiasalut.gencat.cat/handle/11351/11879"),
-    "zonda":       ("IPS-uni", "🟢","<50 l/m",  "Ràpida","https://scientiasalut.gencat.cat/handle/11351/11895"),
-    "respimat":    ("IVS",     "🟢","20-30 l/m","Lenta", "https://scientiasalut.gencat.cat/handle/11351/11891"),
-    "modulite":    ("ICP",     "🔴","20-30 l/m","Lenta", "https://scientiasalut.gencat.cat/handle/11351/11880"),
-    "aerosphere":  ("ICP",     "🔴","20-30 l/m","Lenta", "https://scientiasalut.gencat.cat/handle/11351/11880"),
-}
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# FUNCIONS AUXILIARS
-# ═══════════════════════════════════════════════════════════════════════════════
-def v(val):
-    if val is None: return ""
-    s = str(val).strip()
-    return "" if s == "None" else s
-
-def normalitza_cn(cn):
-    cn = v(cn)
-    try:
-        return str(int(float(cn))) if cn.replace('.','').isdigit() else cn
-    except:
-        return cn
-
-def normalitza_vtm(vtm_nom):
-    return v(vtm_nom).lower().strip()
-
-def cima_get(endpoint, params=None, retries=3):
-    url = f"{CIMA_BASE}/{endpoint}"
-    for i in range(retries):
-        try:
-            r = requests.get(url, params=params, timeout=15)
-            r.raise_for_status()
-            return r.json()
-        except Exception as e:
-            if i < retries - 1: time.sleep(2)
-            else:
-                print(f"  ⚠️  Error CIMA: {e}")
-                return None
-
-def classifica_forma(forma_nom):
-    """Classifica la forma farmacèutica i retorna el tipus base de dispositiu"""
-    fn = forma_nom.upper().strip()
-    if fn in FORMES_NO_INC:
-        return "NEB","—","—","—","", False, True
-    if fn in FORMES_OK:
-        if "ENVASE A PRESIÓN" in fn or "ENVASE A PRESION" in fn:
-            return "ICP","🔴","20-30 l/m","Lenta","https://scientiasalut.gencat.cat/handle/11351/11880", True, False
-        elif "SOLUCIÓN PARA INHALACIÓN" in fn or "LÍQUIDO PARA INHALACIÓN" in fn:
-            return "IVS","🟢","20-30 l/m","Lenta","https://scientiasalut.gencat.cat/handle/11351/11891", True, False
-        elif "CÁPSULA DURA" in fn or "CAPSULA DURA" in fn or "UNIDOSIS" in fn:
-            return "IPS-uni","🟢","<50 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11816", True, False
-        else:
-            return "IPS-multi","🟢","60-90 l/m","Ràpida","https://scientiasalut.gencat.cat/handle/11351/11881", True, False
-    return "?","—","—","—","", False, False
-
-def refina_dispositiu(nom_presentacio, tipus_base, co2_base, flux_base, flux4_base, link_base):
-    """
-    Refina el tipus, flux i link a partir del nom específic del dispositiu.
-    Prioritat: nom dispositiu al nom de la presentació > tipus genèric de la forma.
-    """
-    nl = nom_presentacio.lower()
-    for disp, vals in DISPOSITIU_MAP.items():
-        if disp in nl:
-            return vals  # (tipus, co2, flux, flux4, link)
-    return tipus_base, co2_base, flux_base, flux4_base, link_base
-
-def construeix_dosi_vtm(vtm_nom):
-    """Construeix el text de dosi a partir del vtm.nombre"""
-    vtm = normalitza_vtm(vtm_nom)
-    dosi_text = ""
-    phf_val = matma_val = ""
-    color_atencio = False
-
-    if vtm in VTM_MAP:
-        classe, dosi_mpoc, dmx, starred, matma = VTM_MAP[vtm]
-        dosi_text = f"MPOC: {dosi_mpoc}\nD.màx: {dmx}"
-        if starred: phf_val   = "★"
-        if matma:   matma_val = "MATMA"
-        if vtm in DOSIS_ASMA_GCI_VTM:
-            b, m, a = DOSIS_ASMA_GCI_VTM[vtm]
-            dosi_text += f"\nAsma baixa: {b}\nAsma mitjana: {m}\nAsma alta: {a}"
-        elif vtm in DOSIS_ASMA_COMBO_VTM:
-            b, m, a = DOSIS_ASMA_COMBO_VTM[vtm]
-            dosi_text += f"\nAsma baixa: {b}\nAsma mitjana: {m}\nAsma alta: {a}"
+    if "MPOC" in text and ("Asma" in text or "asma" in text):
+        mpoc_match = re.search(r"MPOC\s*[:\-]?\s*(.+?)(?=Asma|$)", text, re.IGNORECASE | re.DOTALL)
+        if mpoc_match:
+            result["mpoc"] = mpoc_match.group(1).strip().split("\n")[0].strip()
+        baixa_match = re.search(r"[Bb]aixa\s*[:\-]?\s*(.+?)(?=Mitjana|Alta|D\.?\s*[Mm]à?x|$)", text, re.IGNORECASE | re.DOTALL)
+        mitj_match  = re.search(r"Mitjana\s*[:\-]?\s*(.+?)(?=Alta|D\.?\s*[Mm]à?x|$)", text, re.IGNORECASE | re.DOTALL)
+        alta_match  = re.search(r"Alta\s*[:\-]?\s*(.+?)(?=D\.?\s*[Mm]à?x|$)", text, re.IGNORECASE | re.DOTALL)
+        if baixa_match: result["asma_baixa"]  = baixa_match.group(1).strip().split("\n")[0].strip()
+        if mitj_match:  result["asma_mitjana"] = mitj_match.group(1).strip().split("\n")[0].strip()
+        if alta_match:  result["asma_alta"]    = alta_match.group(1).strip().split("\n")[0].strip()
     else:
-        dosi_text = "PENDENT — consultar fitxa CIMA"
-        color_atencio = True
+        dosi_neta = re.sub(r"D\.?\s*[Mm]à?x[\.:]?.+", "", text).strip()
+        if cat in ("GCI", "LABA/GCI", "LAMA/LABA/GCI", "SABA/GCI"):
+            result["mpoc"]       = dosi_neta
+            result["asma_baixa"] = dosi_neta
+        else:
+            result["dose"] = dosi_neta
 
-    return dosi_text, phf_val, matma_val, color_atencio
+    return result
 
-def get_classe_vtm(vtm_nom):
-    vtm = normalitza_vtm(vtm_nom)
-    if vtm in VTM_MAP:
-        return VTM_MAP[vtm][0]
-    return "PENDENT"
+# ── Descarregar fitxers de GitHub ─────────────────────────────────────────────
+def download_from_github(fname: str, mode: str = "binary") -> str:
+    url = f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/main/{fname}"
+    headers = {}
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"token {GITHUB_TOKEN}"
+    r = requests.get(url, headers=headers, timeout=30)
+    r.raise_for_status()
+    local_path = f"/tmp/{fname}"
+    if mode == "text":
+        with open(local_path, "w", encoding="utf-8") as f:
+            f.write(r.text)
+    else:
+        with open(local_path, "wb") as f:
+            f.write(r.content)
+    print(f"  Descarregat {fname} ({len(r.content)/1024:.1f} KB)")
+    return local_path
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CONSULTA CIMA
-# ═══════════════════════════════════════════════════════════════════════════════
-def get_tots_inhaladors_cima():
+# ── Llegir novetats validades de l'Excel ──────────────────────────────────────
+def llegir_novetats_validades(excel_path: str) -> list:
     """
-    Consulta única: vias=78 + atc=R03 + comerc=1 → 341 medicaments.
-    Classe i dosi des de vtm.nombre. Flux des del nom del dispositiu.
+    Retorna NOMÉS les files que són novetats acabades de validar:
+      - Col N = buida  (validat per la Sílvia)
+      - Col M conté URL de cima.aemps.es  (prové del --detecta)
+      - Col L té data  (posada pel --detecta)
+
+    Els fàrmacs originals de l'Excel (sense URL CIMA a col M)
+    s'ignoren → el HTML ja els té i no cal re-processar-los.
     """
-    print("📡 Consultant CIMA — vias=78 + atc=R03...")
-    resultats = []
-    cns_vistos = set()
-    pagina = 1
-    total_consultat = 0
-
-    while True:
-        data = cima_get("medicamentos", {
-            "vias": 78, "atc": "R03", "comerc": 1, "pagina": pagina
-        })
-        if not data: break
-        items = data.get("resultados", [])
-        if not items: break
-        total = data.get("totalFilas", 0)
-        total_consultat += len(items)
-        print(f"  → Pàg {pagina}: {len(items)} ({total_consultat}/{total})")
-
-        for med in items:
-            nregistro = v(med.get("nregistro",""))
-            if not nregistro: continue
-
-            forma_nom = v(med.get("formaFarmaceutica", {}).get("nombre",""))
-            vtm_nom   = v(med.get("vtm", {}).get("nombre",""))
-
-            tipus_base, co2_base, flux_base, flux4_base, link_base, ok, es_neb = \
-                classifica_forma(forma_nom)
-
-            if not ok and not es_neb:
-                continue
-
-            pres_data = cima_get("presentaciones", {
-                "nregistro": nregistro, "comerc": 1
-            })
-            if not pres_data: continue
-
-            for p in pres_data.get("resultados", []):
-                cn  = normalitza_cn(p.get("cn",""))
-                nom = v(p.get("nombre",""))
-                if not cn or cn in cns_vistos:
-                    continue
-                cns_vistos.add(cn)
-
-                if ok and not es_neb:
-                    tipus, co2, flux, flux4, link = refina_dispositiu(
-                        nom, tipus_base, co2_base, flux_base, flux4_base, link_base)
-                else:
-                    tipus, co2, flux, flux4, link = "NEB","—","—","—",""
-
-                p["_nregistro"] = nregistro
-                p["_vtm_nom"]   = vtm_nom
-                p["_classe"]    = get_classe_vtm(vtm_nom)
-                p["_tipus"]     = tipus
-                p["_co2"]       = co2
-                p["_flux"]      = flux
-                p["_flux4"]     = flux4
-                p["_link"]      = link
-                p["_es_neb"]    = es_neb
-                resultats.append(p)
-
-        if total_consultat >= total: break
-        pagina += 1
-        time.sleep(0.3)
-
-    inc = sum(1 for r in resultats if not r.get("_es_neb"))
-    neb = sum(1 for r in resultats if r.get("_es_neb"))
-    print(f"  ✅ Total: {len(resultats)} ({inc} incorporables, {neb} nebulitzadors)")
-    return resultats
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MODES D'EXECUCIÓ
-# ═══════════════════════════════════════════════════════════════════════════════
-def mode_detecta():
-    print("🔍 Mode: detectar novetats CIMA")
-    wb = openpyxl.load_workbook(EXCEL_PATH)
+    wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
     ws = wb.active
 
-    # Lectura CNs — separa múltiples CNs a la mateixa cel·la (ex: "700582 ,710249")
-    cns = set()
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        cel = v(row[I_CN])
-        if not cel: continue
-        for cn in cel.replace(';', ',').split(','):
-            cn_net = normalitza_cn(cn.strip())
-            if cn_net: cns.add(cn_net)
-    print(f"  CNs existents: {len(cns)}")
+    novetats = []
+    COL = {
+        "cat": 0, "ia": 1, "brand": 2, "cn": 3, "disp": 4,
+        "dose": 5, "tipus": 6, "co2": 7, "flux": 8, "man": 9,
+        "link": 10, "data": 11, "origen": 12, "estat": 13,
+        "phf": 14, "matma": 15,
+    }
 
-    presentacions = get_tots_inhaladors_cima()
-    novetats = [p for p in presentacions
-                if normalitza_cn(p.get("cn","")) not in cns]
+    skip_row = True
+    for row in ws.iter_rows(values_only=True):
+        if skip_row:
+            skip_row = False
+            continue
+        if len(row) <= COL["estat"]:
+            continue
+
+        estat  = str(row[COL["estat"]]  or "").strip()
+        origen = str(row[COL["origen"]] or "").strip()
+        data_l = row[COL["data"]]
+
+        # Les 3 condicions per ser "novetat validada"
+        if estat not in ("", "None"):
+            continue                           # NOU — PENDENT o NO INCORPORAR
+        if "cima.aemps.es" not in origen:
+            continue                           # fàrmac original manual → HTML ja el té
+        if not data_l:
+            continue                           # sense data → origen manual
+
+        cat    = str(row[COL["cat"]]   or "").strip()
+        ia     = str(row[COL["ia"]]    or "").strip()
+        if not cat or not ia:
+            continue
+
+        brand  = str(row[COL["brand"]] or "").strip()
+        disp   = str(row[COL["disp"]]  or "").strip()
+        cn     = str(row[COL["cn"]]    or "").strip()
+        link   = str(row[COL["link"]]  or "").strip()
+        phf    = row[COL["phf"]]
+        matma  = row[COL["matma"]]
+        dosi_f = str(row[COL["dose"]]  or "").strip()
+        tipus_f= str(row[COL["tipus"]] or "").strip()
+
+        if "NEB" in tipus_f.upper() or "nebulitz" in disp.lower():
+            continue
+
+        tipus = tipus_f if tipus_f and tipus_f not in ("", "nan", "None") else inferir_tipus(disp)
+        dosi_dict = parsear_dosi(dosi_f, cat)
+        starred = bool(phf and str(phf).strip() not in ("", "None", "nan", "0", "False"))
+        matma_b = bool(matma and str(matma).strip() not in ("", "None", "nan", "0", "False"))
+        cns = [c.strip() for c in re.split(r"[,\n]", cn) if c.strip()]
+
+        farmac = {
+            "cat": cat, "ia": ia, "brands": brand, "disp": disp,
+            "cn": ", ".join(cns), "tipus": tipus,
+            "link": link if link.startswith("http") else "",
+            "starred": starred, "matma": matma_b,
+        }
+        farmac.update(dosi_dict)
+        novetats.append(farmac)
+
+    wb.close()
+    print(f"  Novetats validades a afegir: {len(novetats)}")
+    return novetats
+
+# ── Generar JS per a un fàrmac ────────────────────────────────────────────────
+def farmac_a_js(d: dict) -> str:
+    parts = []
+    parts.append(f"cat:{json.dumps(d['cat'], ensure_ascii=False)}")
+    parts.append(f"ia:{json.dumps(d['ia'], ensure_ascii=False)}")
+    if d.get("starred"): parts.append("starred:true")
+    if d.get("matma"):   parts.append("matma:true")
+    parts.append(f"brands:{json.dumps(d['brands'], ensure_ascii=False)}")
+    parts.append(f"disp:{json.dumps(d['disp'], ensure_ascii=False)}")
+    for camp in ("dose", "mpoc", "asma_baixa", "asma_mitjana", "asma_alta"):
+        if d.get(camp):
+            parts.append(f"{camp}:{json.dumps(d[camp], ensure_ascii=False)}")
+    if d.get("dmx"):
+        parts.append(f"dmx:{json.dumps(d['dmx'], ensure_ascii=False)}")
+    parts.append(f"tipus:{json.dumps(d['tipus'], ensure_ascii=False)}")
+    if d.get("link"):
+        parts.append(f"link:{json.dumps(d['link'], ensure_ascii=False)}")
+    return "  {" + ",\n   ".join(parts) + "}"
+
+# ── Fusionar catalog HTML + novetats Excel ────────────────────────────────────
+def fusionar_catalog(html_path: str, novetats: list) -> str:
+    """
+    Llegeix el HTML actual, extreu el var catalog=[...] existent,
+    li AFEGEIX les novetats al final i retorna el HTML actualitzat.
+    """
+    with open(html_path, "r", encoding="utf-8") as f:
+        html = f.read()
+
+    pattern = re.compile(r"(var catalog=\[)(.*?)(\];)", re.DOTALL)
+    match = pattern.search(html)
+    if not match:
+        raise ValueError("No s'ha trobat 'var catalog=[...];' al HTML.")
+
+    catalog_actual = match.group(2).strip()  # contingut entre [ i ]
+    n_actuals = catalog_actual.count("{cat:")
+    print(f"  Fàrmacs ja al HTML: {n_actuals}")
+    print(f"  Novetats a afegir:  {len(novetats)}")
+
+    # Construir les línies JS de les novetats
+    novetats_js = ""
+    if novetats:
+        novetats_lines = [farmac_a_js(f) for f in novetats]
+        novetats_js = ",\n" + ",\n".join(novetats_lines)
+
+    # Nou catalog = contingut actual + novetats
+    nou_catalog_bloc = f"var catalog=[{catalog_actual}{novetats_js}];"
+
+    html_nou = html[:match.start()] + nou_catalog_bloc + html[match.end():]
+    print(f"  ✅ Total fàrmacs al prescriptor: {n_actuals + len(novetats)}")
+    return html_nou
+
+# ── MODE: --regenera ──────────────────────────────────────────────────────────
+def mode_regenera():
+    """
+    Fusiona el catalog existent al HTML + novetats validades de l'Excel.
+    No toca els fàrmacs originals.
+    """
+    print("\n=== MODE REGENERA (fusió) ===")
+
+    print("1. Descarregant Excel de GitHub...")
+    excel_path = download_from_github(EXCEL_FNAME, mode="binary")
+
+    print("2. Llegint novetats validades de l'Excel...")
+    novetats = llegir_novetats_validades(excel_path)
+
+    if not novetats:
+        print("  ℹ️  Cap novetat validada. El HTML no s'actualitzarà.")
+        with open("publicar_count.txt", "w") as f:
+            f.write("0")
+        return
+
+    print("3. Descarregant HTML actual de GitHub...")
+    html_path = download_from_github(HTML_FNAME, mode="text")
+
+    print("4. Fusionant catalog HTML + novetats...")
+    html_nou = fusionar_catalog(html_path, novetats)
+
+    print("5. Desant HTML actualitzat...")
+    with open(HTML_FNAME, "w", encoding="utf-8") as f:
+        f.write(html_nou)
+    print(f"  ✅ {HTML_FNAME} desat ({len(html_nou)/1024:.1f} KB)")
+
+    with open("publicar_count.txt", "w") as f:
+        f.write(str(len(novetats)))
+
+    print(f"\n✅ REGENERA completat: {len(novetats)} novetats afegides al prescriptor.")
+
+# ── MODE: --comprova-publicar ─────────────────────────────────────────────────
+def mode_comprova_publicar():
+    """Compta novetats validades → publicar_count.txt"""
+    print("\n=== MODE COMPROVA-PUBLICAR ===")
+    excel_path = download_from_github(EXCEL_FNAME, mode="binary")
+    novetats = llegir_novetats_validades(excel_path)
+    with open("publicar_count.txt", "w") as f:
+        f.write(str(len(novetats)))
+    print(f"✅ {len(novetats)} novetats validades llestos per publicar → publicar_count.txt")
+
+# ── MODE: --comprova-pendents ─────────────────────────────────────────────────
+def mode_comprova_pendents():
+    """Compta files amb 'NOU — PENDENT' → pendents_count.txt"""
+    print("\n=== MODE COMPROVA-PENDENTS ===")
+    excel_path = download_from_github(EXCEL_FNAME, mode="binary")
+    wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
+    ws = wb.active
+    count = 0
+    skip = True
+    for row in ws.iter_rows(values_only=True):
+        if skip:
+            skip = False
+            continue
+        estat = str(row[13] or "").strip() if len(row) > 13 else ""
+        if "NOU" in estat and "PENDENT" in estat:
+            count += 1
+    wb.close()
+    with open("pendents_count.txt", "w") as f:
+        f.write(str(count))
+    print(f"✅ {count} fàrmacs pendents de validació → pendents_count.txt")
+
+# ── MODE: --detecta ───────────────────────────────────────────────────────────
+def inferir_cat_des_atc(atc: str, ia: str) -> str:
+    ia_l = ia.lower()
+    if "R03AC" in atc:
+        return "SABA" if any(x in ia_l for x in ["salbutamol", "terbutalin"]) else "LABA"
+    if "R03AL" in atc:
+        te_gci = any(x in ia_l for x in ["beclometasona", "fluticasona", "budesonida", "mometasona"])
+        te_lama = any(x in ia_l for x in ["glicopirroni", "umeclidini", "aclidini"])
+        if te_lama and te_gci: return "LAMA/LABA/GCI"
+        if te_gci:             return "LABA/GCI"
+        return "LABA/LAMA"
+    if "R03AK" in atc:
+        if any(x in ia_l for x in ["glicopirroni", "umeclidini"]): return "LAMA/LABA/GCI"
+        return "LABA/GCI"
+    if "R03BB" in atc:
+        return "SAMA" if "ipratropi" in ia_l else "LAMA"
+    if "R03BA" in atc: return "GCI"
+    if "R03AB" in atc: return "SAMA"
+    return "SABA"
+
+def mode_detecta():
+    print("\n=== MODE DETECTA ===")
+
+    print("1. Descarregant Excel actual...")
+    excel_path = download_from_github(EXCEL_FNAME, mode="binary")
+
+    # Recollir CNs existents
+    wb = openpyxl.load_workbook(excel_path, data_only=True)
+    ws = wb.active
+    cns_existents = set()
+    skip = True
+    for row in ws.iter_rows(values_only=True):
+        if skip:
+            skip = False
+            continue
+        cn_cell = str(row[3] or "").strip()
+        for cn in re.split(r"[,\n\s]+", cn_cell):
+            cn = cn.strip()
+            if cn:
+                cns_existents.add(cn)
+    print(f"  CNs existents: {len(cns_existents)}")
+
+    # Consultar CIMA
+    print("2. Consultant CIMA...")
+    medicaments_cima = []
+    pagina = 1
+    while True:
+        params = {**CIMA_PARAMS, "pagina": pagina}
+        r = requests.get(CIMA_URL, params=params, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        items = data.get("resultados", [])
+        if not items:
+            break
+        medicaments_cima.extend(items)
+        if len(items) < 100:
+            break
+        pagina += 1
+        time.sleep(0.5)
+    print(f"  Total CIMA: {len(medicaments_cima)}")
+
+    # Detectar novetats
+    novetats = []
+    for med in medicaments_cima:
+        cn = str(med.get("cn", "")).strip().zfill(6)
+        if cn not in cns_existents:
+            novetats.append(med)
     print(f"  Novetats: {len(novetats)}")
 
     if not novetats:
-        with open("novetats_count.txt","w") as f: f.write("0")
-        print("✅ Cap novetat")
+        with open("novetats_count.txt", "w") as f:
+            f.write("0")
+        print("✅ Cap novetat.")
         return
 
-    shutil.copy(EXCEL_PATH, EXCEL_PATH.replace(".xlsx","_BACKUP.xlsx"))
-
-    fill_nou     = PatternFill("solid", fgColor=COLOR_NOU)
-    fill_atencio = PatternFill("solid", fgColor=COLOR_ATENCIO)
-    fill_no_inc  = PatternFill("solid", fgColor=COLOR_NO_INC)
-    font_base    = Font(name='Arial', size=10)
-    alineacio    = Alignment(vertical="top", wrap_text=True)
-
+    # Afegir novetats a l'Excel
+    today = date.today().isoformat()
     afegits = 0
-    for i, p in enumerate(novetats[:50], 1):
-        cn        = normalitza_cn(p.get("cn",""))
-        nom       = v(p.get("nombre",""))
-        nregistro = v(p.get("_nregistro",""))
-        vtm_nom   = p.get("_vtm_nom","")
-        classe    = p.get("_classe","PENDENT")
-        tipus     = p.get("_tipus","ICP")
-        co2       = p.get("_co2","🔴")
-        flux      = p.get("_flux","20-30 l/m")
-        flux4     = p.get("_flux4","Lenta")
-        link      = p.get("_link","")
-        es_neb    = p.get("_es_neb", False)
+    for med in novetats:
+        cn   = str(med.get("cn", "")).strip().zfill(6)
+        nom  = med.get("nombre", "").strip()
+        vtm  = med.get("vtm", {})
+        ia   = vtm.get("nombre", nom) if vtm else nom
+        nreg = med.get("nregistro", "")
+        cima_url = f"https://cima.aemps.es/cima/publico/detalle.html?nregistro={nreg}"
+        disp = med.get("formaFarmaFull", "") or med.get("formaFarma", "")
+        tipus = inferir_tipus(disp)
+        if "nebulitz" in disp.lower():
+            continue
+        atc_grup = med.get("atc", [{}])[0].get("codigo", "") if med.get("atc") else ""
+        cat = inferir_cat_des_atc(atc_grup, ia)
 
-        print(f"  [{i}] {'[NEB] ' if es_neb else ''}{nom[:55]} | {classe} | {tipus} | {flux}")
-
-        dosi_text, phf_val, matma_val, color_atencio = construeix_dosi_vtm(vtm_nom)
-
-        if es_neb:
-            estat = "NO INCORPORAR — nebulitzador"
-            color = fill_no_inc
-            tipus = "NEB"
-        elif color_atencio:
-            estat = "NOU — PENDENT VALIDACIÓ CLÍNICA"
-            color = fill_atencio
-        else:
-            estat = "NOU — PENDENT VALIDACIÓ CLÍNICA"
-            color = fill_nou
-
-        fila = [
-            classe, vtm_nom, nom, cn, nom,
-            dosi_text, tipus, co2, flux, flux4, link,
-            datetime.now().strftime("%Y-%m-%d"),
-            f"https://cima.aemps.es/cima/publico/medicamento.html?nregistro={nregistro}",
-            estat, phf_val, matma_val,
-        ]
-
-        ws.append(fila)
-        nr = ws.max_row
-        ws.row_dimensions[nr].height = 40
-        for col in range(1, len(fila)+1):
-            cel = ws.cell(row=nr, column=col)
-            cel.fill = color
-            cel.font = font_base
-            cel.alignment = alineacio
-
+        ws.append([
+            cat, ia, nom, cn, disp,
+            "",      # F dosi (a validar)
+            tipus,   # G tipus
+            "",      # H CO₂
+            "",      # I flux
+            "",      # J maniobra
+            "",      # K link
+            today,   # L data ← posada aquí
+            cima_url,# M origen CIMA ← posada aquí
+            "NOU — PENDENT",  # N estat
+            "", "",  # O PHF, P MATMA
+        ])
         afegits += 1
-        time.sleep(0.4)
 
-    wb.save(EXCEL_PATH)
-    with open("novetats_count.txt","w") as f: f.write(str(afegits))
-    print(f"✅ {afegits} novetats afegides")
+    wb.save(EXCEL_FNAME)
+    with open("novetats_count.txt", "w") as f:
+        f.write(str(afegits))
+    print(f"✅ DETECTA: {afegits} novetats afegides com 'NOU — PENDENT'.")
 
-def mode_comprova_pendents():
-    print("🔍 Mode: comprovar pendents")
-    wb = openpyxl.load_workbook(EXCEL_PATH)
-    ws = wb.active
-    pendents = sum(1 for row in ws.iter_rows(min_row=2, values_only=True)
-                   if len(row) > I_ESTAT and v(row[I_ESTAT]))
-    with open("pendents_count.txt","w") as f: f.write(str(pendents))
-    print(f"  Pendents: {pendents}")
-
-def mode_comprova_publicar():
-    print("🔍 Mode: comprovar per publicar")
-    wb = openpyxl.load_workbook(EXCEL_PATH)
-    ws = wb.active
-    with open(HTML_PATH,"r",encoding="utf-8") as f: html = f.read()
-    pendents = 0
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        if len(row) <= I_ESTAT: continue
-        nom = v(row[I_NOM]); data = v(row[I_DATA]); estat = v(row[I_ESTAT])
-        if not nom: continue
-        if data and not estat and nom not in html:
-            pendents += 1
-    with open("publicar_count.txt","w") as f: f.write(str(pendents))
-    print(f"  Per publicar: {pendents}")
-
-def mode_regenera():
-    print(f"🔄 Regenerant HTML")
-    wb = openpyxl.load_workbook(EXCEL_PATH)
-    ws = wb.active
-    inclosos = saltats = 0
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        if not any(row): continue
-        nom = v(row[I_NOM])
-        if not nom: continue
-        estat = v(row[I_ESTAT])
-        if estat:
-            print(f"  ⏭  {nom[:40]} ({estat[:25]})")
-            saltats += 1
-        else:
-            print(f"  ✅ {nom[:40]}")
-            inclosos += 1
-    print(f"✅ {inclosos} inclosos, {saltats} saltats")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ENTRADA PRINCIPAL
-# ═══════════════════════════════════════════════════════════════════════════════
+# ── MAIN ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    if "--detecta" in args:              mode_detecta()
-    elif "--comprova-pendents" in args:  mode_comprova_pendents()
-    elif "--comprova-publicar" in args:  mode_comprova_publicar()
-    elif "--regenera" in args:           mode_regenera()
-    elif "--tot" in args:
+    parser = argparse.ArgumentParser(description="RespirIA CIMA Updater v6.1")
+    parser.add_argument("--mode", choices=["detecta", "comprova-pendents",
+                        "comprova-publicar", "regenera", "tot"], required=True)
+    args = parser.parse_args()
+
+    if args.mode == "detecta":
+        mode_detecta()
+    elif args.mode == "comprova-pendents":
+        mode_comprova_pendents()
+    elif args.mode == "comprova-publicar":
+        mode_comprova_publicar()
+    elif args.mode == "regenera":
+        mode_regenera()
+    elif args.mode == "tot":
         mode_detecta()
         mode_regenera()
-    else:
-        print("⚠️  Usa: --detecta | --comprova-pendents | --comprova-publicar | --regenera | --tot")
