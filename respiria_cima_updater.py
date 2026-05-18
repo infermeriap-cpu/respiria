@@ -453,7 +453,7 @@ def mode_detecta():
     # Afegir novetats a l'Excel
     today = date.today().isoformat()
     afegits = 0
-    descartats = 0
+    descartats_neb = 0
     for med in novetats:
         cn   = str(med.get("cn", "")).strip().zfill(6)
         nom  = med.get("nombre", "").strip()
@@ -463,31 +463,30 @@ def mode_detecta():
         cima_url = f"https://cima.aemps.es/cima/publico/detalle.html?nregistro={nreg}"
         disp = med.get("formaFarmaFull", "") or med.get("formaFarma", "")
 
-        # Filtre 1: forma farmacèutica ha de ser inhalador vàlid
-        if not es_inhalador_valid(disp):
-            descartats += 1
+        # Unic filtre automatic: nebulitzadors
+        # La CIMA ja filtra per vias=78 i atc=R03
+        # Tu valores la resta manualment al Google Sheets
+        if "nebuliz" in disp.lower() or "nebulitz" in disp.lower():
+            descartats_neb += 1
             continue
 
         tipus = inferir_tipus(disp)
         atc_grup = med.get("atc", [{}])[0].get("codigo", "") if med.get("atc") else ""
         cat = inferir_cat_des_atc(atc_grup, ia)
-
-        # Filtre 2: categoria ha de ser reconeguda (no None)
-        if cat is None:
-            descartats += 1
-            continue
+        if not cat:
+            cat = "PENDENT - REVISAR CLASSE"
 
         ws.append([
             cat, ia, nom, cn, disp,
-            "",      # F dosi (a validar)
-            tipus,   # G tipus
-            "",      # H CO₂
+            "",      # F dosi (a validar per tu)
+            tipus,   # G tipus inferit
+            "",      # H CO2
             "",      # I flux
             "",      # J maniobra
             "",      # K link
-            today,   # L data ← posada aquí
-            cima_url,# M origen CIMA ← posada aquí
-            "NOU — PENDENT",  # N estat
+            today,   # L data
+            cima_url,# M origen CIMA
+            "NOU - PENDENT",  # N estat
             "", "",  # O PHF, P MATMA
         ])
         afegits += 1
@@ -495,7 +494,7 @@ def mode_detecta():
     wb.save(EXCEL_FNAME)
     with open("novetats_count.txt", "w") as f:
         f.write(str(afegits))
-    print(f"✅ DETECTA: {afegits} novetats afegides com 'NOU — PENDENT' ({descartats} descartades per forma/ATC incorrecte).")
+    print(f"DETECTA: {afegits} novetats afegides | {descartats_neb} nebulitzadors descartats.")
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
