@@ -33,7 +33,7 @@ jobs:
           echo "=== Fitxers al repositori ==="
           ls -la
           echo "=== Test importacions ==="
-          python -c "import requests, openpyxl; from bs4 import BeautifulSoup; print('Importacions OK')"
+          python -c "import requests, openpyxl; print('Importacions OK')"
           echo "=== Test lectura Excel ==="
           python -c "import openpyxl; wb=openpyxl.load_workbook('inhaladors_MPOC_ASMA_Avanzado_FINAL.xlsx'); ws=wb.active; print(f'Excel OK: {ws.max_row} files')"
 
@@ -41,7 +41,7 @@ jobs:
         id: check
         run: |
           set -x
-          python respiria_cima_updater.py --mode=detecta 2>&1
+          python respiria_cima_updater.py --detecta 2>&1
           echo "Exit code: $?"
           if [ -f novetats_count.txt ]; then
             COUNT=$(cat novetats_count.txt)
@@ -54,7 +54,6 @@ jobs:
               echo "num_novetats=0" >> $GITHUB_OUTPUT
             fi
           else
-            echo "ATENCIO: novetats_count.txt NO existeix"
             echo "hi_ha_novetats=false" >> $GITHUB_OUTPUT
             echo "num_novetats=0" >> $GITHUB_OUTPUT
           fi
@@ -93,8 +92,6 @@ jobs:
             - Marca MATMA si correspon (columna P)
             - Quan hagis validat una fila, esborra el text de la columna N
 
-            Tens 7 dies per validar. Si no ho fas rebras un recordatori.
-
             Els farmacs NO s'incorporaran al prescriptor fins que no els validis.
 
             Salutacions,
@@ -122,7 +119,7 @@ jobs:
       - name: Comprovar pendents antics
         id: pendents
         run: |
-          python respiria_cima_updater.py --mode=comprova-pendents
+          python respiria_cima_updater.py --comprova-pendents
           if [ -f pendents_count.txt ]; then
             COUNT=$(cat pendents_count.txt)
             echo "num_pendents=$COUNT" >> $GITHUB_OUTPUT
@@ -182,7 +179,7 @@ jobs:
       - name: Comprovar si hi ha novetats validades per publicar
         id: publicar
         run: |
-          python respiria_cima_updater.py --mode=comprova-publicar
+          python respiria_cima_updater.py --comprova-publicar
           if [ -f publicar_count.txt ]; then
             COUNT=$(cat publicar_count.txt)
             echo "num_publicar=$COUNT" >> $GITHUB_OUTPUT
@@ -198,14 +195,14 @@ jobs:
 
       - name: Regenerar HTML amb farmacs validats
         if: steps.publicar.outputs.cal_publicar == 'true'
-        run: python respiria_cima_updater.py --mode=regenera
+        run: python respiria_cima_updater.py --regenera
 
       - name: Guardar HTML actualitzat
         if: steps.publicar.outputs.cal_publicar == 'true'
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add RespirIA_v2.html inhaladors_MPOC_ASMA_Avanzado_FINAL.xlsx
+          git add RespirIA_v2.html
           git commit -m "Prescriptor actualitzat: ${{ steps.publicar.outputs.num_publicar }} nous farmacs validats incorporats" || echo "Sense canvis"
           git push
 
