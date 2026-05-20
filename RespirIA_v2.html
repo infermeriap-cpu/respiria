@@ -301,8 +301,25 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#fff;color:var(--tex
   <div class="sat-result hidden" id="sat-result"></div>
   <div class="sat-stats hidden" id="sat-stats"></div>
 </div>
-<div style="text-align:center;font-size:11px;color:#9CA3AF;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)"><span id="usage-counter" style="display:block;font-size:12px;color:#CBD5E1;margin-bottom:6px"></span>
-  <img src="data:image/png;base64,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" alt="CC BY NC ND" style="height:22px;vertical-align:middle;margin-right:8px">Bibliografia: Consens AIFICC · CAMFIC · SOCAP · PHF<br>Autor: Sílvia Álvarez Vega<br>Coautor: Comissió de Millora de la Pràctica Clínica · 25.3.2026
+
+<!-- AVÍS IMPORTANT -->
+<div class="pnote amber" style="display:flex;align-items:flex-start;gap:12px;margin-top:20px">
+  <span style="font-size:22px;flex-shrink:0">⚠️</span>
+  <div>
+    <strong>Avís important:</strong> Aquesta eina és un suport a la presa de decisions clíniques. La decisió final sobre la prescripció i el tractament correspon sempre al professional sanitari, qui és responsable d'avaluar les característiques individuals de cada pacient. L'eina no desa dades clíniques ni personals; només guarda localment dades tècniques d'ús i satisfacció.
+  </div>
+</div>
+
+<!-- DATA D'ACTUALITZACIÓ -->
+<div style="text-align:center;font-size:12px;color:var(--muted);margin-top:16px;padding:10px 0">
+  Per a qualsevol incidència o suggeriment amb el prescriptor, poseu-vos en contacte amb <a href="mailto:silvia.Alvarez.Vega@gencat.cat" style="color:var(--blue);text-decoration:none">Sílvia Álvarez Vega</a>
+  <div style="margin-top:6px"><span id="usage-counter"></span></div>
+</div>
+
+<!-- BIBLIOGRAFIA -->
+<div style="text-align:center;font-size:11px;color:#9CA3AF;margin-top:12px;padding-top:16px;border-top:1px solid var(--border)">
+  &#169; Bibliografia: Consens AIFICC · CAMFIC · SOCAP · PHF · GEMA 5.5<br>
+  Autor: Sílvia Álvarez Vega · Darrera actualització: 25.3.2026
 </div>
 </div>
 
@@ -650,7 +667,37 @@ function appendTag(nodeId,html){
   n.appendChild(d);
 }
 
+function rebuildFromState(){
+  // Rebuild UI based on current state keys
+  var keys=['cognitiu','manual','man','dev','ips'];
+  // Find the deepest key still in state
+  var lastKey=null;
+  for(var i=0;i<keys.length;i++){
+    if(state[keys[i]]!==undefined) lastKey=keys[i]; else break;
+  }
+  // Full reset then replay saved state
+  var saved=JSON.parse(JSON.stringify(state));
+  state={};
+  reset(true); // silent reset
+  // Re-apply each saved key in order
+  var replayOrder=['cognitiu','manual','man','dev','ips'];
+  for(var j=0;j<replayOrder.length;j++){
+    var k=replayOrder[j];
+    if(saved[k]!==undefined) sel(k,saved[k]);
+  }
+}
 function sel(key,val){
+  // Allow deselecting: if clicking same option again, go back one step
+  if(state[key]!==undefined && state[key]===val){
+    // Deselect: reset this key and all downstream keys
+    var keys=['cognitiu','manual','man','dev','ips'];
+    var idx=keys.indexOf(key);
+    if(idx!==-1){
+      for(var i=idx;i<keys.length;i++) delete state[keys[i]];
+    }
+    rebuildFromState();
+    return;
+  }
   state[key]=val;
   if(key==='cat'){
     setLane('lane1','done');
@@ -927,7 +974,7 @@ function showResult(){
   incrementCounter();
 }
 
-function reset(){
+function reset(silent){
   // 1. Clear state
   state={cat:null,cognitiu:null,man:null,manual:null,dev:null,ipsType:null};
 
@@ -1014,7 +1061,7 @@ function reset(){
 
   // 9. Hide reset button, scroll top
   document.getElementById('breset').classList.add('hidden');
-  window.scrollTo({top:0,behavior:'smooth'});
+  if(!silent) window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function incrementCounter(){
