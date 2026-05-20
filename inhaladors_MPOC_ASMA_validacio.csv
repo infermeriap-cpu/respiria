@@ -45,7 +45,7 @@ LABA,Olodaterol,Striverdi®,726792,Respimat®: 2.5 mcg/inh,"5 mcg c/24 h
 (D.màx. 5 mcg/24 h)",IVS,🟢, 20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11891,,,,,
 SAMA,Bromur d'ipratropi,Atrovent®,720011,pMDI: 20 mcg/inh,"40 mcg c/6h si cal
 (D.màx. 240 mcg c/24 h)",ICP,🔴 , 20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,,,,★,
-SAMA,Bromur d'ipratropi,Atroaldo®,672312,pMDI: 20 mcg/inh,"40 mcg c/6h si cal
+SAMA,Bromur d'ipratropi,Atroaldo®,"672312 , 605412",pMDI: 20 mcg/inh,"40 mcg c/6h si cal
 (D.màx. 240 mcg c/24 h)",ICP,🔴 , 20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,,,,★,
 LAMA,Bromur de tiotropi,Spiriva®,654832,Handihaler®: 18 mcg/inh,"18 mcg c/24 h
 (D.màx: 18 mcg c/24 h)",IPS uni ,🟢,<50 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11879,,,,★,
@@ -273,7 +273,7 @@ Pauta en Asma:
   Dosi Mitjana: 50/250 mcg c/12h
   Dosi Alta: 50/500 mcg c/12h
 (D. Máx: 50/500 mcg/12h)",IPS multi,🟢,60-90 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11813,,,,★,
-LABA/GCI,Salmeterol / Fluticasona propionat,Anasma®,"700542,700543,700544","Accuhaler®: 50/100, 50/250, 50/500 mcg/inh","Pauta en MPOC: 50/500 mcg c/12 h
+LABA/GCI,Salmeterol / Fluticasona propionat,Anasma®,",700543,700544, 842898","Accuhaler®: 50/100, 50/250, 50/500 mcg/inh","Pauta en MPOC: 50/500 mcg c/12 h
 Pauta en Asma:
   Dosi Baixa: 50/100 mcg c/12h
   Dosi Mitjana: 50/250 mcg c/12h
@@ -285,7 +285,7 @@ Pauta en Asma:
   Dosi Mitjana: 50/250 mcg c/12h
   Dosi Alta: 50/500 mcg c/12h
 (D. Máx: 50/500 mcg/12h)",IPS multi,🟢,60-90 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11813,,,,★,
-LABA/GCI,Salmeterol / Fluticasona propionat,Plusvent®,"939959, 940544, 940569","Accuhaler®: 50/100, 50/250, 50/500 mcg/inh","Pauta en MPOC: 50/500 mcg c/12 h
+LABA/GCI,Salmeterol / Fluticasona propionat,Plusvent®,"939959, 940544, 940551","Accuhaler®: 50/100, 50/250, 50/500 mcg/inh","Pauta en MPOC: 50/500 mcg c/12 h
 Pauta en Asma:
   Dosi Baixa: 50/100 mcg c/12h
   Dosi Mitjana: 50/250 mcg c/12h
@@ -309,7 +309,7 @@ Pauta en Asma:
   Dosi Mitjana: 50/250 mcg c/12h
   Dosi Alta: 50/500 mcg c/12h
 (D. Máx: 50/500 mcg/12h)",ICP,🔴 , 20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,,,,★,
-LABA/GCI,Salmeterol / Fluticasona propionat,Plusvent®,"932178, 932202, 932236","pMDI: 25/50, 25/125, 25/250 mcg/inh","Pauta en MPOC: 50/500 mcg c/12 h
+LABA/GCI,Salmeterol / Fluticasona propionat,Plusvent®,"932178 , 932236 , 932228","pMDI: 25/50, 25/125, 25/250 mcg/inh","Pauta en MPOC: 50/500 mcg c/12 h
 Pauta en Asma:
   Dosi Baixa: 50/100 mcg c/12h
   Dosi Mitjana: 50/250 mcg c/12h
@@ -371,3 +371,155 @@ LAMA/LABA/GCI,"Glicopirroni / Indacaterol / Furoato de mometasona
 LAMA/LABA/GCI,"Glicopirroni / Indacaterol / Furoato de mometasona
 ",Zimbus®,729880,Breezhaler®: 144/46/136,"Pauta en Asma: 114/46/136 c/24h
 (D. Màx: 114/46/136 c/24h)",IPS uni ,🟢,>90 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11816,,,,★,MATMA
+SAMA,bromuro ipratropio,"ATROVENT MONODOSIS 250 mcg / 2ml SOLUCION PARA INHALACION POR NEBULIZADOR , 100 ampollas de 2 ml",648956,"ATROVENT MONODOSIS 250 mcg / 2ml SOLUCION PARA INHALACION POR NEBULIZADOR , 100 ampollas de 2 ml","MPOC: 40 µg si cal
+D.màx: 240 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=61185,NO INCORPORAR — nebulitzador,★,
+SAMA,bromuro ipratropio,"ATROVENT MONODOSIS 250 mcg / 2ml SOLUCION PARA INHALACION POR NEBULIZADOR , 20 ampollas de 2 ml",678078,"ATROVENT MONODOSIS 250 mcg / 2ml SOLUCION PARA INHALACION POR NEBULIZADOR , 20 ampollas de 2 ml","MPOC: 40 µg si cal
+D.màx: 240 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=61185,NO INCORPORAR — nebulitzador,★,
+SAMA,bromuro ipratropio,"ATROVENT MONODOSIS 500 mcg/ 2ml SOLUCION PARA INHALACION POR NEBULIZADOR, 100 ampollas de 2 ml",648964,"ATROVENT MONODOSIS 500 mcg/ 2ml SOLUCION PARA INHALACION POR NEBULIZADOR, 100 ampollas de 2 ml","MPOC: 40 µg si cal
+D.màx: 240 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=61184,NO INCORPORAR — nebulitzador,★,
+SAMA,bromuro ipratropio,"ATROVENT MONODOSIS 500 mcg/ 2ml SOLUCION PARA INHALACION POR NEBULIZADOR, 20 ampollas de 2 ml",678086,"ATROVENT MONODOSIS 500 mcg/ 2ml SOLUCION PARA INHALACION POR NEBULIZADOR, 20 ampollas de 2 ml","MPOC: 40 µg si cal
+D.màx: 240 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=61184,NO INCORPORAR — nebulitzador,★,
+LABA/GCI, Indacaterol / Furoato de mometasona, Bemrist®,"729878 , 729879 , 729877","Breezhaler®: 125/127,5 , 125/62,5 ,125/260","D.màx: 125 / 260  µg/24h
+Asma baixa125 / 62,5 µg/24h
+Asma mitjana:125 / 127,5 µg/24h
+Asma alta: 125 / 260  µg/24h",IPS-uni,🟢,>90 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11816,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=1201441006,,,
+LABA/GCI,Formoterol / Beclometasona,Bibecfo®,"764529, 764531","pMDI:  6/100, 6/200","Pauta en MPOC: 12/200 mcg/12 h
+Pauta en Asma:
+  Dosi Baixa: 100/6 mcg: 1 inh c/12h
+  Dosi Mitjana: 100/6 mcg: 2 inh c/12h
+  Dosi Alta: 200/6 mcg: 2 inh c/12h
+(D. Màx: 12/400 mcg c/12h)",ICP,🔴,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=89439,,,
+GCI,budesonida,"BUDESONIDA ALDO-UNION 0,25 mg/ml SUSPENSION PARA INHALACION POR NEBULIZADOR , 20 ampollas de 2 ml",651628,"BUDESONIDA ALDO-UNION 0,25 mg/ml SUSPENSION PARA INHALACION POR NEBULIZADOR , 20 ampollas de 2 ml","MPOC: 200-400 µg/12h
+D.màx: 800 µg/12h
+Asma baixa: 200-400 µg/24h
+Asma mitjana: 401-800 µg/24h
+Asma alta: 801-1.600 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=66943,NO INCORPORAR — nebulitzador,,
+GCI,budesonida,"BUDESONIDA ALDO-UNION 0,5 mg/ml SUSPENSION PARA INHALACION POR NEBULIZADOR , 20 ampollas de 2 ml",651626,"BUDESONIDA ALDO-UNION 0,5 mg/ml SUSPENSION PARA INHALACION POR NEBULIZADOR , 20 ampollas de 2 ml","MPOC: 200-400 µg/12h
+D.màx: 800 µg/12h
+Asma baixa: 200-400 µg/24h
+Asma mitjana: 401-800 µg/24h
+Asma alta: 801-1.600 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=66942,NO INCORPORAR — nebulitzador,,
+GCI,budesonida,"BUDESONIDA ALDO-UNION 200 microgramos/pulsación SUSPENSIÓN PARA INHALACIÓN EN ENVASE A PRESIÓN, 1 inhalador de 200 dosis",799015,"BUDESONIDA ALDO-UNION 200 microgramos/pulsación SUSPENSIÓN PARA INHALACIÓN EN ENVASE A PRESIÓN, 1 inhalador de 200 dosis","MPOC: 200-400 µg/12h
+D.màx: 800 µg/12h
+Asma baixa: 200-400 µg/24h
+Asma mitjana: 401-800 µg/24h
+Asma alta: 801-1.600 µg/24h",ICP,🔴,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=61664,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+SABA/SAMA,salbutamol + bromuro ipratropio,"COMBIPRASAL 0.5 mg/2.5 mg SOLUCION PARA INHALACION POR NEBULIZADOR, 20 ampollas de 2,5 ml",677602,"COMBIPRASAL 0.5 mg/2.5 mg SOLUCION PARA INHALACION POR NEBULIZADOR, 20 ampollas de 2,5 ml","MPOC: 100-200/40 µg si cal
+D.màx: 200/240 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=73561,NO INCORPORAR — nebulitzador,,
+GCI,fluticasona,"FLUSONAL ACCUHALER 500 MICROGRAMOS/INHALACION, POLVO PARA INHALACION, 1 inhalador de 60 dosis",689042,"FLUSONAL ACCUHALER 500 MICROGRAMOS/INHALACION, POLVO PARA INHALACION, 1 inhalador de 60 dosis","MPOC: 250-500 µg/12h
+D.màx: 500 µg/12h
+Asma baixa: 100-250 µg/24h
+Asma mitjana: 251-500 µg/24h
+Asma alta: 501-1.000 µg/24h",IPS-multi,🟢,60-90 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11813,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=60530,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+LABA/GCI,fluticasona + formoterol,"FLUTIFORM 125 MICROGRAMOS / 5 MICROGRAMOS/ INHALACION SUPSENSION PARA INHALACION EN ENVASE A PRESION , 1 inhalador (120 pulsaciones)",701717,"FLUTIFORM 125 MICROGRAMOS / 5 MICROGRAMOS/ INHALACION SUPSENSION PARA INHALACION EN ENVASE A PRESION , 1 inhalador (120 pulsaciones)","MPOC: 5/125 µg/12h
+D.màx: 5/250 µg/12h
+Asma baixa: 5/100 µg/12h
+Asma mitjana: 5/250 µg/12h
+Asma alta: 5/500 µg/12h",ICP,🔴,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=78536,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+LABA/GCI,fluticasona + formoterol,"FLUTIFORM 250 MICROGRAMOS / 10 MICROGRAMOS/ INHALACION  SUSPENSION PARA INHALACION EN ENVASE A PRESION , 1 inhalador ( 120 pulsaciones)",701718,"FLUTIFORM 250 MICROGRAMOS / 10 MICROGRAMOS/ INHALACION  SUSPENSION PARA INHALACION EN ENVASE A PRESION , 1 inhalador ( 120 pulsaciones)","MPOC: 5/125 µg/12h
+D.màx: 5/250 µg/12h
+Asma baixa: 5/100 µg/12h
+Asma mitjana: 5/250 µg/12h
+Asma alta: 5/500 µg/12h",ICP,🔴,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=78537,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+LABA/GCI,fluticasona + formoterol,"FLUTIFORM 50 MICROGRAMOS / 5 MICROGRAMOS/ INHALACION SUSPENSION PARA INHALACION EN ENVASE A PRESION , 1 inhalador (120 pulsaciones)",701719,"FLUTIFORM 50 MICROGRAMOS / 5 MICROGRAMOS/ INHALACION SUSPENSION PARA INHALACION EN ENVASE A PRESION , 1 inhalador (120 pulsaciones)","MPOC: 5/125 µg/12h
+D.màx: 5/250 µg/12h
+Asma baixa: 5/100 µg/12h
+Asma mitjana: 5/250 µg/12h
+Asma alta: 5/500 µg/12h",ICP,🔴,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=78538,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+GCI,fluticasona,"INALACOR ACCUHALER 500 MICROGRAMOS/INHALACIÓN POLVO PARA INHALACIÓN, 1 inhalador + 60 alveolos",686097,"INALACOR ACCUHALER 500 MICROGRAMOS/INHALACIÓN POLVO PARA INHALACIÓN, 1 inhalador + 60 alveolos","MPOC: 250-500 µg/12h
+D.màx: 500 µg/12h
+Asma baixa: 100-250 µg/24h
+Asma mitjana: 251-500 µg/24h
+Asma alta: 501-1.000 µg/24h",IPS-multi,🟢,60-90 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11813,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=60691,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+GCI,fluticasona,"INALACOR 250 MICROGRAMOS/INHALACIÓN SUSPENSIÓN PARA INHALACIÓN EN ENVASE A PRESIÓN, 1 inhalador + 1 cartucho de 120 dosis",686154,"INALACOR 250 MICROGRAMOS/INHALACIÓN SUSPENSIÓN PARA INHALACIÓN EN ENVASE A PRESIÓN, 1 inhalador + 1 cartucho de 120 dosis","MPOC: 250-500 µg/12h
+D.màx: 500 µg/12h
+Asma baixa: 100-250 µg/24h
+Asma mitjana: 251-500 µg/24h
+Asma alta: 501-1.000 µg/24h",ICP,🔴,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=60688,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+LABA,formoterol,"OXIS TURBUHALER  4,5 microgramos/INHALACION POLVO PARA INHALACION , 1 inhalador de 60 dosis",668871,"OXIS TURBUHALER  4,5 microgramos/INHALACION POLVO PARA INHALACION , 1 inhalador de 60 dosis","MPOC: 12 µg/12h
+D.màx: 24 µg/12h",IPS-multi,🟢,50-60 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11893,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=61666,NOU — PENDENT VALIDACIÓ CLÍNICA,★,
+GCI,budesonida,"PULMICORT 0,25 mg/ml SUSPENSION PARA INHALACION POR  NEBULIZADOR, 5 ampollas de 2 ml",901199,"PULMICORT 0,25 mg/ml SUSPENSION PARA INHALACION POR  NEBULIZADOR, 5 ampollas de 2 ml","MPOC: 200-400 µg/12h
+D.màx: 800 µg/12h
+Asma baixa: 200-400 µg/24h
+Asma mitjana: 401-800 µg/24h
+Asma alta: 801-1.600 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=59298,NO INCORPORAR — nebulitzador,,
+GCI,budesonida,"PULMICORT 0,50 mg/ml SUSPENSION PARA INHALACION POR NEBULIZADOR, 5 ampollas de 2 ml",901082,"PULMICORT 0,50 mg/ml SUSPENSION PARA INHALACION POR NEBULIZADOR, 5 ampollas de 2 ml","MPOC: 200-400 µg/12h
+D.màx: 800 µg/12h
+Asma baixa: 200-400 µg/24h
+Asma mitjana: 401-800 µg/24h
+Asma alta: 801-1.600 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=59297,NO INCORPORAR — nebulitzador,,
+SABA,salbutamol,"SALBUAIR 2.5 mg SOLUCION PARA INHALACION POR NEBULIZADOR , 60 ampollas de 2,5 ml",677362,"SALBUAIR 2.5 mg SOLUCION PARA INHALACION POR NEBULIZADOR , 60 ampollas de 2,5 ml","MPOC: 100-200 µg si cal
+D.màx: 200 µg/6h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=73563,NO INCORPORAR — nebulitzador,★,
+SABA,salbutamol,"SALBUAIR 5 mg SOLUCION PARA INHALACION POR NEBULIZADOR, 60 ampollas de 2,5 ml",677363,"SALBUAIR 5 mg SOLUCION PARA INHALACION POR NEBULIZADOR, 60 ampollas de 2,5 ml","MPOC: 100-200 µg si cal
+D.màx: 200 µg/6h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=73562,NO INCORPORAR — nebulitzador,★,
+SABA,salbutamol,SALBUTAMOL ALDO-UNION 100 microgramos/dosis SUSPENSION PARA INHALACION EN ENVASE A PRESION  20 inhaladores de 200 dosis,607323,SALBUTAMOL ALDO-UNION 100 microgramos/dosis SUSPENSION PARA INHALACION EN ENVASE A PRESION  20 inhaladores de 200 dosis,"MPOC: 100-200 µg si cal
+D.màx: 200 µg/6h",ICP,🔴,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=65850,NOU — PENDENT VALIDACIÓ CLÍNICA,★,
+LAMA,glicopirronio,"SEEBRI BREEZHALER 44 MICROGRAMOS POLVO PARA INHALACION (CAPSULA DURA) , 1 inhalador + 30 cápsulas",694302,"SEEBRI BREEZHALER 44 MICROGRAMOS POLVO PARA INHALACION (CAPSULA DURA) , 1 inhalador + 30 cápsulas","MPOC: 44 µg/24h
+D.màx: 44 µg/24h",IPS-uni,🟢,>90 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11816,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=12778003,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+LABA/LAMA,olodaterol + tiotropio,"SPIOLTO RESPIMAT 2,5 MICROGRAMOS/2,5 MICROGRAMOS SOLUCION PARA INHALACION 1 cartucho de 60 pulsaciones (30 dosis)",726795,"SPIOLTO RESPIMAT 2,5 MICROGRAMOS/2,5 MICROGRAMOS SOLUCION PARA INHALACION 1 cartucho de 60 pulsaciones (30 dosis)","MPOC: 5/5 µg/24h
+D.màx: 5/5 µg/24h",IVS,🟢,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11891,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=79967,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+LAMA,tiotropio,"SPIRIVA RESPIMAT 2,5 microgramos SOLUCION PARA INHALACION, 1 inhalador recargable + 1 cartucho de 60 pulsaciones (30 dosis)",725702,"SPIRIVA RESPIMAT 2,5 microgramos SOLUCION PARA INHALACION, 1 inhalador recargable + 1 cartucho de 60 pulsaciones (30 dosis)","MPOC: 18 µg/24h (Handihaler) / 5 µg/24h (Respimat) / 10 µg/24h (Zonda)
+D.màx: = pauta",IVS,🟢,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11891,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=69589,NOU — PENDENT VALIDACIÓ CLÍNICA,★,
+LAMA,tiotropio,"TAVULUS 18 MICROGRAMOS POLVO PARA INHALACION (CAPSULA DURA), 30 cápsulas + inhalador",731040,"TAVULUS 18 MICROGRAMOS POLVO PARA INHALACION (CAPSULA DURA), 30 cápsulas + inhalador","MPOC: 18 µg/24h (Handihaler) / 5 µg/24h (Respimat) / 10 µg/24h (Zonda)
+D.màx: = pauta",IPS-uni,🟢,<50 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11816,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=85978,NOU — PENDENT VALIDACIÓ CLÍNICA,★,
+SABA,salbutamol,"VENTOLIN 5 mg/ml SOLUCION PARA INHALACION POR NEBULIZADOR, 1 frasco de 10 ml",941807,"VENTOLIN 5 mg/ml SOLUCION PARA INHALACION POR NEBULIZADOR, 1 frasco de 10 ml","MPOC: 100-200 µg si cal
+D.màx: 200 µg/6h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=55147,NO INCORPORAR — nebulitzador,★,
+LABA/LAMA,olodaterol + tiotropio,"YANIMO RESPIMAT 2,5 MICROGRAMOS / 2,5 MICROGRAMOS SOLUCION PARA INHALACION, 1 inhalador recargable + 1 cartucho de 60 pulsaciones (30 dosis",726790,"YANIMO RESPIMAT 2,5 MICROGRAMOS / 2,5 MICROGRAMOS SOLUCION PARA INHALACION, 1 inhalador recargable + 1 cartucho de 60 pulsaciones (30 dosis","MPOC: 5/5 µg/24h
+D.màx: 5/5 µg/24h",IVS,🟢,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11891,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=79966,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+LABA/GCI,Salmeterol / Fluticasona propionat,"AMAIRA 50 MICROGRAMOS/100 MICROGRAMOS/INHALACION, POLVO PARA INHALACION (UNIDOSIS), 1 inhalador de 60 dosis",730593,"AMAIRA 50 MICROGRAMOS/100 MICROGRAMOS/INHALACION, POLVO PARA INHALACION (UNIDOSIS), 1 inhalador de 60 dosis","MPOC: 50/500 µg/12h
+D.màx: 50/500 µg/12h
+Asma baixa: 50/100 µg/12h
+Asma mitjana: 50/250 µg/12h
+Asma alta: 50/500 µg/12h",IPS-uni,🟢,<50 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11816,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=85851,NO INCORPORAR,,
+LABA/GCI,Salmeterol / Fluticasona propionat,"AMAIRA 50 MICROGRAMOS/250 MICROGRAMOS/INHALACION, POLVO PARA INHALACION (UNIDOSIS), 1 Inhalador de 60 dosis",730594,"AMAIRA 50 MICROGRAMOS/250 MICROGRAMOS/INHALACION, POLVO PARA INHALACION (UNIDOSIS), 1 Inhalador de 60 dosis","MPOC: 50/500 µg/12h
+D.màx: 50/500 µg/12h
+Asma baixa: 50/100 µg/12h
+Asma mitjana: 50/250 µg/12h
+Asma alta: 50/500 µg/12h",IPS-uni,🟢,<50 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11816,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=85852,NO INCORPORAR,,
+LABA/GCI,Salmeterol / Fluticasona propionat,"AMAIRA 50 MICROGRAMOS/500 MICROGRAMOS/INHALACION, POLVO PARA INHALACION (UNIDOSIS), 1 inhalador de 60 dosis",730595,"AMAIRA 50 MICROGRAMOS/500 MICROGRAMOS/INHALACION, POLVO PARA INHALACION (UNIDOSIS), 1 inhalador de 60 dosis","MPOC: 50/500 µg/12h
+D.màx: 50/500 µg/12h
+Asma baixa: 50/100 µg/12h
+Asma mitjana: 50/250 µg/12h
+Asma alta: 50/500 µg/12h",IPS-uni,🟢,<50 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11816,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=85853,NO INCORPORAR,,
+LABA/GCI, Indacaterol / Furoato de mometasona,"ATECTURA BREEZHALER 125 microgramos/127,5 microgramos POLVO PARA INHALACION (CAPSULA DURA), 30 x 1 cápsulas (dosis unitaria) + 1 inhalador",728970,"ATECTURA BREEZHALER 125 microgramos/127,5 microgramos POLVO PARA INHALACION (CAPSULA DURA), 30 x 1 cápsulas (dosis unitaria) + 1 inhalador",,IPS-uni,🟢,>90 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11816,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=1201439006,NO INCORPORAR  ,,
+LABA/GCI, Indacaterol / Furoato de mometasona,"ATECTURA BREEZHALER 125 microgramos/260 microgramos POLVO PARA INHALACION (CAPSULA DURA), 30 x 1 cápsulas (dosis unitaria) + 1 inhalador",728971,"ATECTURA BREEZHALER 125 microgramos/260 microgramos POLVO PARA INHALACION (CAPSULA DURA), 30 x 1 cápsulas (dosis unitaria) + 1 inhalador",,IPS-uni,🟢,>90 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11816,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=1201439010,NO INCORPORAR  ,,
+LABA/GCI, Indacaterol / Furoato de mometasona,"ATECTURA BREEZHALER 125 microgramos/62,5 microgramos POLVO PARA INHALACION (CAPSULA DURA), 30 x 1 cápsulas (dosis unitaria) + 1 inhalador",728969,"ATECTURA BREEZHALER 125 microgramos/62,5 microgramos POLVO PARA INHALACION (CAPSULA DURA), 30 x 1 cápsulas (dosis unitaria) + 1 inhalador",,IPS-uni,🟢,>90 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11816,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=1201439002,NO INCORPORAR  ,,
+GCI,beclometasona,"BECLO-ASMA 100 MICROGRAMOS/PULSACION SOLUCION PARA INHALACION EN ENVASE A PRESION, 1 inhalador de 200 dosis",714479,"BECLO-ASMA 100 MICROGRAMOS/PULSACION SOLUCION PARA INHALACION EN ENVASE A PRESION, 1 inhalador de 200 dosis","MPOC: 250-500 µg/12h
+D.màx: 1.000 µg/12h
+Asma baixa: 200-500 µg/24h
+Asma mitjana: 501-1.000 µg/24h
+Asma alta: 1.001-2.000 µg/24h",ICP,🔴,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=81684,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+GCI,beclometasona,"BECLO-ASMA 50 MICROGRAMOS/PULSACION SOLUCION PARA INHALACION EN ENVASE A PRESION, 1 inhalador de 200 dosis",714441,"BECLO-ASMA 50 MICROGRAMOS/PULSACION SOLUCION PARA INHALACION EN ENVASE A PRESION, 1 inhalador de 200 dosis","MPOC: 250-500 µg/12h
+D.màx: 1.000 µg/12h
+Asma baixa: 200-500 µg/24h
+Asma mitjana: 501-1.000 µg/24h
+Asma alta: 1.001-2.000 µg/24h",ICP,🔴,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=81667,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+SAMA,bromuro ipratropio,"BROMURO DE IPRATROPIO ALDO-UNION 500 microgramos SOLUCION PARA INHALACION POR NEBULIZADOR, 20 ampollas de 2 ml",663046,"BROMURO DE IPRATROPIO ALDO-UNION 500 microgramos SOLUCION PARA INHALACION POR NEBULIZADOR, 20 ampollas de 2 ml","MPOC: 40 µg si cal
+D.màx: 240 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=70939,NO INCORPORAR — nebulitzador,★,
+SABA/SAMA,salbutamol + bromuro ipratropio,"BROMURO DE IPRATROPIO/SALBUTAMOL GENETIC 0,5 MG/2,5 MG SOLUCION PARA INHALACION POR NEBULIZADOR, 20 ampollas",757412,"BROMURO DE IPRATROPIO/SALBUTAMOL GENETIC 0,5 MG/2,5 MG SOLUCION PARA INHALACION POR NEBULIZADOR, 20 ampollas","MPOC: 100-200/40 µg si cal
+D.màx: 200/240 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=87927,NO INCORPORAR — nebulitzador,,
+GCI,budesonida,"BUDENA 0,25 MG/ML SUSPENSION PARA INHALACION POR NEBULIZADOR, 20 ampollas de 2 ml",728863,"BUDENA 0,25 MG/ML SUSPENSION PARA INHALACION POR NEBULIZADOR, 20 ampollas de 2 ml","MPOC: 200-400 µg/12h
+D.màx: 800 µg/12h
+Asma baixa: 200-400 µg/24h
+Asma mitjana: 401-800 µg/24h
+Asma alta: 801-1.600 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=85219,NO INCORPORAR — nebulitzador,,
+GCI,budesonida,"BUDENA 0,5 MG/ML SUSPENSION PARA INHALACION POR NEBULIZADOR, 20 ampollas de 2 ml",728864,"BUDENA 0,5 MG/ML SUSPENSION PARA INHALACION POR NEBULIZADOR, 20 ampollas de 2 ml","MPOC: 200-400 µg/12h
+D.màx: 800 µg/12h
+Asma baixa: 200-400 µg/24h
+Asma mitjana: 401-800 µg/24h
+Asma alta: 801-1.600 µg/24h",NEB,—,—,—,,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=85220,NO INCORPORAR — nebulitzador,,
+GCI,budesonida,"BUDESONIDA PULMICTAN 200 microgramos/INHALACION SUSPENSION PARA INHALACION EN ENVASE A PRESION , 1 inhalador de 200 dosis",686770,"BUDESONIDA PULMICTAN 200 microgramos/INHALACION SUSPENSION PARA INHALACION EN ENVASE A PRESION , 1 inhalador de 200 dosis","MPOC: 200-400 µg/12h
+D.màx: 800 µg/12h
+Asma baixa: 200-400 µg/24h
+Asma mitjana: 401-800 µg/24h
+Asma alta: 801-1.600 µg/24h",ICP,🔴,20-30 l/m,Lenta,https://scientiasalut.gencat.cat/handle/11351/11880,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=59035,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+LABA/GCI,budesonida + formoterol,"BUDESONIDA/FORMOTEROL CIPLA 160 MICROGRAMOS/4,5 MICROGRAMOS/INHALACION POLVO PARA INHALACION (UNIDOSIS), 1 inhalador (60 dosis)",723825,"BUDESONIDA/FORMOTEROL CIPLA 160 MICROGRAMOS/4,5 MICROGRAMOS/INHALACION POLVO PARA INHALACION (UNIDOSIS), 1 inhalador (60 dosis)","MPOC: 9/320 µg/12h
+D.màx: 36/1.280 µg/24h
+Asma baixa: 4.5/160 µg/12h
+Asma mitjana: 9/320 µg/12h
+Asma alta: 2 inh 9/320 µg/12h",IPS-uni,🟢,<50 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11816,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=83517,NOU — PENDENT VALIDACIÓ CLÍNICA,,
+LABA/GCI,budesonida + formoterol,"BUDESONIDA/FORMOTEROL CIPLA 160 MICROGRAMOS/4,5 MICROGRAMOS/INHALACION POLVO PARA INHALACION (UNIDOSIS), 2 inhaladores ( 2 x 60 dosis)",731458,"BUDESONIDA/FORMOTEROL CIPLA 160 MICROGRAMOS/4,5 MICROGRAMOS/INHALACION POLVO PARA INHALACION (UNIDOSIS), 2 inhaladores ( 2 x 60 dosis)","MPOC: 9/320 µg/12h
+D.màx: 36/1.280 µg/24h
+Asma baixa: 4.5/160 µg/12h
+Asma mitjana: 9/320 µg/12h
+Asma alta: 2 inh 9/320 µg/12h",IPS-uni,🟢,<50 l/m,Ràpida,https://scientiasalut.gencat.cat/handle/11351/11816,Tue May 19 2026 00:00:00 GMT+0200 (hora de verano de Europa central),https://cima.aemps.es/cima/publico/medicamento.html?nregistro=83517,NOU — PENDENT VALIDACIÓ CLÍNICA,,
